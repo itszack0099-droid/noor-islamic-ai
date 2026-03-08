@@ -19,7 +19,7 @@ const TabBar = ({ activeTab, onTabChange }: TabBarProps) => {
       className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full glass-dark z-50"
       style={{
         maxWidth: 393,
-        height: 116,
+        height: 72,
         borderTop: "0.5px solid rgba(255,255,255,0.08)",
       }}
     >

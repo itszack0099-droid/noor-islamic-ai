@@ -24,7 +24,7 @@ const streakDays = [
 
 const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
   return (
-    <div className="px-5" style={{ paddingTop: 70 }}>
+    <div className="px-5 pt-5">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

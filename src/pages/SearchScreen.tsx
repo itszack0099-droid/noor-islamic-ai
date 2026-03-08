@@ -40,7 +40,7 @@ const SearchScreen = () => {
   const [activeFilter, setActiveFilter] = useState("all");
 
   return (
-    <div style={{ paddingTop: 59, background: "#000", minHeight: "100vh" }}>
+    <div style={{ paddingTop: 12, background: "#000", minHeight: "100vh" }}>
       {/* Search Bar */}
       <div className="px-5 pt-3">
         <div

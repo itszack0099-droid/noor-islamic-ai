@@ -44,7 +44,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div style={{ background: "linear-gradient(160deg, #050F08, #0D4D2E)", paddingTop: 59 }}>
+      <div style={{ background: "linear-gradient(160deg, #050F08, #0D4D2E)", paddingTop: 12 }}>
         <div className="flex items-center justify-between px-5 py-3">
           <button
             onClick={onBack}
