@@ -1,4 +1,4 @@
-import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, MapPin, Search, Loader2 } from "lucide-react";
+import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, MapPin, Search, Loader2, BarChart3 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 interface HomeScreenProps {
