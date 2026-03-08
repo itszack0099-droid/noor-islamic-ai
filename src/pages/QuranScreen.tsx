@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { ChevronLeft, Mic, Play, Bookmark, Share2, BookOpen } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ChevronLeft, Mic, Square, Play, Bookmark, Share2, RotateCcw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Surah {
@@ -18,11 +18,59 @@ interface Ayah {
   translation: string;
 }
 
+interface WordResult {
+  word: string;
+  status: "correct" | "wrong" | "skipped";
+  spoken?: string;
+}
+
+interface RecitationResult {
+  ayahIdx: number;
+  words: WordResult[];
+  score: number;
+  total: number;
+}
+
 interface QuranScreenProps {
   onBack: () => void;
 }
 
 const CACHE_PREFIX = "quran_surah_";
+
+// Strip Arabic diacritics for comparison
+function stripDiacritics(s: string) {
+  return s.replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED]/g, "").trim();
+}
+
+function normalizeArabic(s: string) {
+  return stripDiacritics(s)
+    .replace(/\u0671/g, "\u0627") // alef wasla -> alef
+    .replace(/[\u0622\u0623\u0625]/g, "\u0627") // hamza variants
+    .replace(/\u0629/g, "\u0647") // taa marbuta -> haa
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function compareWords(expected: string, spoken: string): WordResult[] {
+  const expWords = expected.split(/\s+/).filter(Boolean);
+  const spkWords = spoken.split(/\s+/).filter(Boolean);
+  const results: WordResult[] = [];
+
+  let si = 0;
+  for (let ei = 0; ei < expWords.length; ei++) {
+    const ew = normalizeArabic(expWords[ei]);
+    if (si < spkWords.length && normalizeArabic(spkWords[si]) === ew) {
+      results.push({ word: expWords[ei], status: "correct" });
+      si++;
+    } else if (si < spkWords.length) {
+      results.push({ word: expWords[ei], status: "wrong", spoken: spkWords[si] });
+      si++;
+    } else {
+      results.push({ word: expWords[ei], status: "skipped" });
+    }
+  }
+  return results;
+}
 
 const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [surahs, setSurahs] = useState<Surah[]>([]);
@@ -30,52 +78,81 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [selectedSurah, setSelectedSurah] = useState<Surah | null>(null);
   const [ayahs, setAyahs] = useState<Ayah[]>([]);
   const [loadingAyahs, setLoadingAyahs] = useState(false);
-  const [listening, setListening] = useState(false);
 
-  // Fetch surah list
+  // Recitation state
+  const [listening, setListening] = useState(false);
+  const [activeAyahIdx, setActiveAyahIdx] = useState(0);
+  const [result, setResult] = useState<RecitationResult | null>(null);
+  const recognitionRef = useRef<any>(null);
+
   useEffect(() => {
     const cached = localStorage.getItem("quran_surah_list");
-    if (cached) {
-      setSurahs(JSON.parse(cached));
-      setLoadingSurahs(false);
-      return;
-    }
-    fetch("https://api.alquran.cloud/v1/surah")
-      .then((r) => r.json())
-      .then((d) => {
-        setSurahs(d.data);
-        localStorage.setItem("quran_surah_list", JSON.stringify(d.data));
-      })
-      .finally(() => setLoadingSurahs(false));
+    if (cached) { setSurahs(JSON.parse(cached)); setLoadingSurahs(false); return; }
+    fetch("https://api.alquran.cloud/v1/surah").then(r => r.json()).then(d => {
+      setSurahs(d.data);
+      localStorage.setItem("quran_surah_list", JSON.stringify(d.data));
+    }).finally(() => setLoadingSurahs(false));
   }, []);
 
-  // Fetch ayahs for selected surah
   useEffect(() => {
     if (!selectedSurah) return;
     const key = CACHE_PREFIX + selectedSurah.number;
     const cached = localStorage.getItem(key);
-    if (cached) {
-      setAyahs(JSON.parse(cached));
-      setLoadingAyahs(false);
-      return;
-    }
+    if (cached) { setAyahs(JSON.parse(cached)); setLoadingAyahs(false); return; }
     setLoadingAyahs(true);
     fetch(`https://api.alquran.cloud/v1/surah/${selectedSurah.number}/editions/quran-uthmani,en.asad`)
-      .then((r) => r.json())
-      .then((d) => {
+      .then(r => r.json()).then(d => {
         const arabic = d.data[0].ayahs;
         const english = d.data[1].ayahs;
         const merged: Ayah[] = arabic.map((a: any, i: number) => ({
-          number: a.number,
-          numberInSurah: a.numberInSurah,
-          text: a.text,
-          translation: english[i]?.text || "",
+          number: a.number, numberInSurah: a.numberInSurah, text: a.text, translation: english[i]?.text || "",
         }));
         setAyahs(merged);
         localStorage.setItem(key, JSON.stringify(merged));
-      })
-      .finally(() => setLoadingAyahs(false));
+      }).finally(() => setLoadingAyahs(false));
   }, [selectedSurah]);
+
+  const startListening = useCallback(() => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR || ayahs.length === 0) return;
+
+    setResult(null);
+    setListening(true);
+
+    const recognition = new SR();
+    recognition.lang = "ar-SA";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognitionRef.current = recognition;
+
+    recognition.onresult = (e: any) => {
+      const spoken = e.results[0][0].transcript || "";
+      const ayah = ayahs[activeAyahIdx];
+      const words = compareWords(ayah.text, spoken);
+      const correct = words.filter(w => w.status === "correct").length;
+      const res: RecitationResult = { ayahIdx: activeAyahIdx, words, score: correct, total: words.length };
+      setResult(res);
+      setListening(false);
+
+      // Auto-advance on perfect
+      if (correct === words.length && activeAyahIdx < ayahs.length - 1) {
+        setTimeout(() => {
+          setActiveAyahIdx(prev => prev + 1);
+          setResult(null);
+        }, 1500);
+      }
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+    recognition.start();
+  }, [ayahs, activeAyahIdx]);
+
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    setListening(false);
+  }, []);
+
+  const toggleMic = () => listening ? stopListening() : startListening();
 
   // --- SURAH LIST ---
   if (!selectedSurah) {
@@ -83,49 +160,24 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
       <div className="min-h-screen">
         <div style={{ background: "linear-gradient(160deg, #050F08, #0D4D2E)", paddingTop: 12 }}>
           <div className="flex items-center justify-between px-5 py-3">
-            <button
-              onClick={onBack}
-              className="flex items-center justify-center rounded-full"
-              style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}
-            >
+            <button onClick={onBack} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
               <ChevronLeft size={20} className="text-foreground" />
             </button>
             <h2 className="text-foreground font-bold" style={{ fontSize: 20 }}>Quran</h2>
             <div style={{ width: 36 }} />
           </div>
         </div>
-
         <div className="px-4 py-3">
           {loadingSurahs
             ? Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                   <Skeleton className="w-10 h-10 rounded-lg" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-48" />
-                  </div>
+                  <div className="flex-1 space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-48" /></div>
                 </div>
               ))
             : surahs.map((s) => (
-                <button
-                  key={s.number}
-                  onClick={() => setSelectedSurah(s)}
-                  className="flex items-center gap-3 w-full text-left py-3 active:scale-[0.98] transition-transform"
-                  style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
-                >
-                  <div
-                    className="flex items-center justify-center font-bold shrink-0"
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 10,
-                      background: "#0D4D2E",
-                      color: "#25A566",
-                      fontSize: 13,
-                    }}
-                  >
-                    {s.number}
-                  </div>
+                <button key={s.number} onClick={() => { setSelectedSurah(s); setActiveAyahIdx(0); setResult(null); }} className="flex items-center gap-3 w-full text-left py-3 active:scale-[0.98] transition-transform" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div className="flex items-center justify-center font-bold shrink-0" style={{ width: 40, height: 40, borderRadius: 10, background: "#0D4D2E", color: "#25A566", fontSize: 13 }}>{s.number}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <p className="text-foreground font-semibold" style={{ fontSize: 14 }}>{s.englishName}</p>
@@ -145,84 +197,53 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   // --- SURAH DETAIL ---
   return (
     <div className="min-h-screen">
-      {/* Header */}
       <div style={{ background: "linear-gradient(160deg, #050F08, #0D4D2E)", paddingTop: 12 }}>
         <div className="flex items-center justify-between px-5 py-3">
-          <button
-            onClick={() => { setSelectedSurah(null); setAyahs([]); }}
-            className="flex items-center justify-center rounded-full"
-            style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}
-          >
+          <button onClick={() => { setSelectedSurah(null); setAyahs([]); setResult(null); setListening(false); }} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
             <ChevronLeft size={20} className="text-foreground" />
           </button>
           <h2 className="text-foreground font-bold" style={{ fontSize: 20 }}>{selectedSurah.englishName}</h2>
           <button
-            onClick={() => setListening(!listening)}
-            className="flex items-center justify-center rounded-full"
+            onClick={toggleMic}
+            className="flex items-center justify-center rounded-full transition-all"
             style={{
-              width: 36,
-              height: 36,
-              background: "#C9A84C",
-              ...(listening ? { animation: "pulse-gold 1.5s ease infinite" } : {}),
+              width: 36, height: 36,
+              background: listening ? "#ef4444" : "#C9A84C",
+              boxShadow: listening ? "0 0 16px rgba(239,68,68,0.5)" : "none",
             }}
           >
-            <Mic size={18} style={{ color: "#0A0F0D" }} />
+            {listening ? <Square size={16} style={{ color: "#fff" }} /> : <Mic size={18} style={{ color: "#0A0F0D" }} />}
           </button>
         </div>
 
-        <div
-          className="mx-5 flex items-center justify-between px-4 py-3"
-          style={{ background: "rgba(0,0,0,0.3)", borderRadius: "16px 16px 0 0" }}
-        >
+        <div className="mx-5 flex items-center justify-between px-4 py-3" style={{ background: "rgba(0,0,0,0.3)", borderRadius: "16px 16px 0 0" }}>
           <p className="font-arabic" style={{ fontSize: 22, color: "#C9A84C" }}>{selectedSurah.name}</p>
           <div className="text-right">
             <p className="text-foreground" style={{ fontSize: 13 }}>{selectedSurah.englishNameTranslation}</p>
-            <p className="text-muted-foreground" style={{ fontSize: 11 }}>
-              {selectedSurah.numberOfAyahs} Ayaat · {selectedSurah.revelationType === "Meccan" ? "Makki" : "Madani"}
-            </p>
+            <p className="text-muted-foreground" style={{ fontSize: 11 }}>{selectedSurah.numberOfAyahs} Ayaat · {selectedSurah.revelationType === "Meccan" ? "Makki" : "Madani"}</p>
           </div>
         </div>
       </div>
 
       {/* Listening Bar */}
       {listening && (
-        <div
-          className="mx-5 mt-3 flex items-center justify-between px-4 py-3"
-          style={{ background: "linear-gradient(135deg, #0D4D2E, #1A7A4A)", borderRadius: 16 }}
-        >
+        <div className="mx-5 mt-3 flex items-center justify-between px-4 py-3" style={{ background: "linear-gradient(135deg, #0D4D2E, #1A7A4A)", borderRadius: 16 }}>
           <div className="flex items-center gap-2">
             <div className="flex items-end gap-0.5" style={{ height: 24 }}>
-              {[12, 20, 8, 16, 24].map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded-full"
-                  style={{
-                    width: 3,
-                    background: "#25A566",
-                    animation: `wave-bar ${0.8 + i * 0.15}s ease-in-out infinite`,
-                    animationDelay: `${i * 0.1}s`,
-                  }}
-                />
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="rounded-full" style={{ width: 3, background: "#25A566", animation: `wave-bar ${0.8 + i * 0.15}s ease-in-out infinite`, animationDelay: `${i * 0.1}s` }} />
               ))}
             </div>
             <span className="text-foreground" style={{ fontSize: 13, fontWeight: 600 }}>AI is listening… recite now</span>
           </div>
-          <button
-            onClick={() => setListening(false)}
-            className="px-3 py-1 rounded-full"
-            style={{ background: "rgba(255,255,255,0.15)", color: "#fff", fontSize: 12, fontWeight: 600 }}
-          >
-            Stop
-          </button>
+          <button onClick={stopListening} className="px-3 py-1 rounded-full" style={{ background: "rgba(255,255,255,0.15)", color: "#fff", fontSize: 12, fontWeight: 600 }}>Stop</button>
         </div>
       )}
 
-      {/* Bismillah (skip for At-Tawbah) */}
+      {/* Bismillah */}
       {selectedSurah.number !== 9 && (
         <div className="py-5 text-center" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <p className="font-arabic" style={{ fontSize: 22, color: "#F0D080" }}>
-            بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ
-          </p>
+          <p className="font-arabic" style={{ fontSize: 22, color: "#F0D080" }}>بِسْمِ اللَّهِ الرَّحْمَـٰنِ الرَّحِيمِ</p>
         </div>
       )}
 
@@ -231,51 +252,110 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
         {loadingAyahs
           ? Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                <Skeleton className="h-4 w-8 mb-3" />
-                <Skeleton className="h-6 w-full mb-2" />
-                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-8 mb-3" /><Skeleton className="h-6 w-full mb-2" /><Skeleton className="h-4 w-3/4" />
               </div>
             ))
-          : ayahs.map((ayah) => (
-              <div
-                key={ayah.number}
-                className="px-5 py-4"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div
-                    className="flex items-center justify-center font-bold"
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 7,
-                      background: "#0D4D2E",
-                      color: "#fff",
-                      fontSize: 11,
-                    }}
-                  >
-                    {ayah.numberInSurah}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {[Play, Bookmark, Share2].map((Icon, i) => (
-                      <button
-                        key={i}
-                        className="flex items-center justify-center rounded-full"
-                        style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}
-                      >
-                        <Icon size={14} className="text-foreground" />
+          : ayahs.map((ayah, idx) => {
+              const isActive = idx === activeAyahIdx && listening;
+              const hasResult = result && result.ayahIdx === idx;
+
+              return (
+                <div
+                  key={ayah.number}
+                  className="px-5 py-4 transition-all"
+                  style={{
+                    borderBottom: "1px solid rgba(255,255,255,0.05)",
+                    ...(isActive ? { borderLeft: "3px solid #C9A84C", background: "rgba(201,168,76,0.06)" } : {}),
+                    ...(hasResult ? { borderLeft: "3px solid #25A566", background: "rgba(37,165,102,0.04)" } : {}),
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center font-bold" style={{ width: 26, height: 26, borderRadius: 7, background: "#0D4D2E", color: "#fff", fontSize: 11 }}>
+                        {ayah.numberInSurah}
+                      </div>
+                      {isActive && (
+                        <span className="px-2 py-0.5 rounded-full" style={{ fontSize: 10, background: "rgba(201,168,76,0.2)", color: "#C9A84C", fontWeight: 600 }}>
+                          Recite this ayah
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => { setActiveAyahIdx(idx); setResult(null); }} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: idx === activeAyahIdx ? "rgba(37,165,102,0.2)" : "rgba(255,255,255,0.07)" }}>
+                        <Mic size={14} style={{ color: idx === activeAyahIdx ? "#25A566" : "#fff" }} />
                       </button>
-                    ))}
+                      {[Play, Bookmark, Share2].map((Icon, i) => (
+                        <button key={i} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
+                          <Icon size={14} className="text-foreground" />
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Arabic text — color-coded if result */}
+                  {hasResult ? (
+                    <p className="font-arabic text-right flex flex-wrap justify-end gap-1" dir="rtl" style={{ fontSize: 21, lineHeight: 1.85 }}>
+                      {result!.words.map((w, wi) => (
+                        <span key={wi} style={{
+                          color: w.status === "correct" ? "#25A566" : w.status === "wrong" ? "#ef4444" : "#f59e0b",
+                          textDecoration: w.status === "wrong" ? "underline" : "none",
+                          textDecorationColor: w.status === "wrong" ? "#ef4444" : undefined,
+                        }}>
+                          {w.word}
+                        </span>
+                      ))}
+                    </p>
+                  ) : (
+                    <p className="font-arabic text-right" dir="rtl" style={{ fontSize: 21, lineHeight: 1.85, color: "#F0D080" }}>
+                      {ayah.text}
+                    </p>
+                  )}
+
+                  <p className="mt-2" style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>{ayah.translation}</p>
+
+                  {/* Result card */}
+                  {hasResult && (
+                    <div className="mt-3 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      {/* Score */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span style={{ fontSize: 13, fontWeight: 700, color: result!.score === result!.total ? "#25A566" : "#ef4444" }}>
+                          {result!.score === result!.total
+                            ? `Masha'Allah! ${result!.score}/${result!.total} correct ✅`
+                            : `${result!.total - result!.score} mistake${result!.total - result!.score > 1 ? "s" : ""} found ❌`}
+                        </span>
+                        <button onClick={() => { setResult(null); startListening(); }} className="flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ background: "rgba(201,168,76,0.15)", color: "#C9A84C", fontSize: 11, fontWeight: 600 }}>
+                          <RotateCcw size={12} /> Try Again
+                        </button>
+                      </div>
+
+                      {/* Mistakes */}
+                      {result!.words.filter(w => w.status !== "correct").map((w, i) => (
+                        <div key={i} className="flex items-center gap-3 py-1.5" style={{ borderTop: i > 0 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
+                          <div className="flex-1">
+                            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                              {w.status === "skipped" ? "Skipped:" : "You said:"}
+                            </span>
+                            <span className="font-arabic ml-2" style={{ fontSize: 15, color: w.status === "wrong" ? "#ef4444" : "#f59e0b" }}>
+                              {w.spoken || "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Correct:</span>
+                            <span className="font-arabic ml-2" style={{ fontSize: 15, color: "#25A566" }}>{w.word}</span>
+                          </div>
+                        </div>
+                      ))}
+
+                      {result!.score === result!.total && activeAyahIdx < ayahs.length - 1 && (
+                        <p className="text-center mt-2" style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>
+                          Auto-advancing to next ayah…
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <p className="font-arabic text-right" dir="rtl" style={{ fontSize: 21, lineHeight: 1.85, color: "#F0D080" }}>
-                  {ayah.text}
-                </p>
-                <p className="mt-2" style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>
-                  {ayah.translation}
-                </p>
-              </div>
-            ))}
+              );
+            })}
       </div>
     </div>
   );
