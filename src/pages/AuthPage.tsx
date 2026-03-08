@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Mail, Lock, Eye, EyeOff, User, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
 
 interface AuthPageProps {
@@ -43,11 +44,10 @@ const AuthPage = ({ onLogin }: AuthPageProps) => {
   };
 
   const handleSocialLogin = async (provider: "google" | "apple") => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: window.location.origin },
+    const { error } = await lovable.auth.signInWithOAuth(provider, {
+      redirect_uri: window.location.origin,
     });
-    if (error) toast.error(error.message);
+    if (error) toast.error(String(error));
   };
 
   return (
