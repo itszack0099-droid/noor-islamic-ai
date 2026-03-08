@@ -1,5 +1,4 @@
-import { useState } from "react";
-import StatusBar from "./StatusBar";
+import { useState, useEffect } from "react";
 import TabBar from "./TabBar";
 import HomeScreen from "../pages/HomeScreen";
 import QuranScreen from "../pages/QuranScreen";
@@ -26,12 +25,9 @@ const AppShell = () => {
       className="relative mx-auto overflow-hidden bg-background"
       style={{ maxWidth: 393, minHeight: "100dvh" }}
     >
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 z-50" style={{ maxWidth: 393, width: "100%" }}>
-        <StatusBar />
-      </div>
       <div
         className="overflow-y-auto scrollbar-none animate-fade-slide-in"
-        style={{ paddingBottom: 116 }}
+        style={{ paddingBottom: 90 }}
         key={activeTab}
       >
         {renderScreen()}

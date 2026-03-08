@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Mail, Lock, Eye, EyeOff, User } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface AuthPageProps {
   onLogin: () => void;
@@ -11,10 +13,41 @@ const AuthPage = ({ onLogin }: AuthPageProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin();
+    setLoading(true);
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: name },
+            emailRedirectTo: window.location.origin,
+          },
+        });
+        if (error) throw error;
+        toast.success("Check your email to confirm your account!");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        onLogin();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Authentication failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSocialLogin = async (provider: "google" | "apple") => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) toast.error(error.message);
   };
 
   return (
@@ -22,7 +55,7 @@ const AuthPage = ({ onLogin }: AuthPageProps) => {
       className="min-h-screen flex flex-col items-center justify-center px-6"
       style={{ background: "#0A0F0D" }}
     >
-      {/* Logo / Branding */}
+      {/* Logo */}
       <div className="text-center mb-10">
         <div
           className="mx-auto flex items-center justify-center rounded-2xl mb-4"
@@ -79,6 +112,7 @@ const AuthPage = ({ onLogin }: AuthPageProps) => {
             className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
             placeholder="Email"
             style={{ fontSize: 14 }}
+            required
           />
         </div>
 
@@ -99,6 +133,7 @@ const AuthPage = ({ onLogin }: AuthPageProps) => {
             className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
             placeholder="Password"
             style={{ fontSize: 14 }}
+            required
           />
           <button type="button" onClick={() => setShowPassword(!showPassword)}>
             {showPassword ? (
@@ -111,15 +146,18 @@ const AuthPage = ({ onLogin }: AuthPageProps) => {
 
         <button
           type="submit"
-          className="w-full font-bold text-foreground"
+          disabled={loading}
+          className="w-full font-bold text-foreground flex items-center justify-center gap-2"
           style={{
             height: 50,
             borderRadius: 14,
             background: "linear-gradient(135deg, #1A7A4A, #25A566)",
             fontSize: 15,
             marginTop: 8,
+            opacity: loading ? 0.7 : 1,
           }}
         >
+          {loading && <Loader2 size={18} className="animate-spin" />}
           {isSignUp ? "Create Account" : "Sign In"}
         </button>
       </form>
@@ -134,6 +172,7 @@ const AuthPage = ({ onLogin }: AuthPageProps) => {
       {/* Social Logins */}
       <div className="flex gap-3 mt-4 w-full max-w-sm">
         <button
+          onClick={() => handleSocialLogin("google")}
           className="flex-1 flex items-center justify-center gap-2 font-semibold"
           style={{
             height: 50,
@@ -153,6 +192,7 @@ const AuthPage = ({ onLogin }: AuthPageProps) => {
           Google
         </button>
         <button
+          onClick={() => handleSocialLogin("apple")}
           className="flex-1 flex items-center justify-center gap-2 font-semibold"
           style={{
             height: 50,
