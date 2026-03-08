@@ -1,4 +1,4 @@
-import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, MapPin, Search, Loader2 } from "lucide-react";
+import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, MapPin, Search, Loader2, BarChart3 } from "lucide-react";
 import { useState, useEffect } from "react";
 
 interface HomeScreenProps {
@@ -121,9 +121,14 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
           <p className="font-arabic text-accent" style={{ fontSize: 14 }}>السلام عليكم ورحمة الله</p>
           <h1 className="text-foreground font-bold mt-1" style={{ fontSize: 28 }}>Ahmad! 👋</h1>
         </div>
-        <button className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
-          <Bell size={18} className="text-foreground" />
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => onNavigate("progress")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(37,165,102,0.15)" }}>
+            <BarChart3 size={18} style={{ color: "#25A566" }} />
+          </button>
+          <button className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
+            <Bell size={18} className="text-foreground" />
+          </button>
+        </div>
       </div>
 
       {/* Prayer Times */}

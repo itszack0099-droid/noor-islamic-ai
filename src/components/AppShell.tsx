@@ -5,6 +5,7 @@ import QuranScreen from "../pages/QuranScreen";
 import HadithScreen from "../pages/HadithScreen";
 import SearchScreen from "../pages/SearchScreen";
 import AIChatScreen from "../pages/AIChatScreen";
+import ProgressDashboard from "../pages/ProgressDashboard";
 
 const AppShell = () => {
   const [activeTab, setActiveTab] = useState("home");
@@ -16,6 +17,7 @@ const AppShell = () => {
       case "hadith": return <HadithScreen onBack={() => setActiveTab("home")} />;
       case "search": return <SearchScreen />;
       case "ai": return <AIChatScreen />;
+      case "progress": return <ProgressDashboard onBack={() => setActiveTab("home")} onNavigate={setActiveTab} />;
       default: return <HomeScreen onNavigate={setActiveTab} />;
     }
   };

@@ -47,6 +47,87 @@ export type Database = {
         }
         Relationships: []
       }
+      reading_progress: {
+        Row: {
+          created_at: string
+          hadith_abudawud_read: number
+          hadith_bukhari_read: number
+          hadith_ibnmajah_read: number
+          hadith_muslim_read: number
+          hadith_nasai_read: number
+          hadith_tirmizi_read: number
+          id: string
+          last_ayah_number: number
+          last_surah_name: string
+          last_surah_number: number
+          total_ayahs_read: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hadith_abudawud_read?: number
+          hadith_bukhari_read?: number
+          hadith_ibnmajah_read?: number
+          hadith_muslim_read?: number
+          hadith_nasai_read?: number
+          hadith_tirmizi_read?: number
+          id?: string
+          last_ayah_number?: number
+          last_surah_name?: string
+          last_surah_number?: number
+          total_ayahs_read?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hadith_abudawud_read?: number
+          hadith_bukhari_read?: number
+          hadith_ibnmajah_read?: number
+          hadith_muslim_read?: number
+          hadith_nasai_read?: number
+          hadith_tirmizi_read?: number
+          id?: string
+          last_ayah_number?: number
+          last_surah_name?: string
+          last_surah_number?: number
+          total_ayahs_read?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_activity: {
+        Row: {
+          activity_date: string
+          created_at: string
+          hadith_read: number
+          id: string
+          quran_ayahs_read: number
+          reading_minutes: number
+          user_id: string
+        }
+        Insert: {
+          activity_date?: string
+          created_at?: string
+          hadith_read?: number
+          id?: string
+          quran_ayahs_read?: number
+          reading_minutes?: number
+          user_id: string
+        }
+        Update: {
+          activity_date?: string
+          created_at?: string
+          hadith_read?: number
+          id?: string
+          quran_ayahs_read?: number
+          reading_minutes?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
