@@ -40,7 +40,7 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div style={{ background: "linear-gradient(160deg, #0F0800, #3D1A00)", paddingTop: 59 }}>
+      <div style={{ background: "linear-gradient(160deg, #0F0800, #3D1A00)", paddingTop: 12 }}>
         <div className="flex items-center justify-between px-5 py-3">
           <button
             onClick={onBack}

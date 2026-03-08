@@ -55,7 +55,7 @@ const AIChatScreen = () => {
       <div
         className="flex items-center gap-3 px-5 pb-3"
         style={{
-          paddingTop: 65,
+          paddingTop: 16,
           background: "rgba(109,40,217,0.12)",
           backdropFilter: "blur(20px)",
           borderBottom: "1px solid rgba(109,40,217,0.2)",
