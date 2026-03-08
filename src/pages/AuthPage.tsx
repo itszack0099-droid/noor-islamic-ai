@@ -44,11 +44,10 @@ const AuthPage = ({ onLogin }: AuthPageProps) => {
   };
 
   const handleSocialLogin = async (provider: "google" | "apple") => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: window.location.origin },
+    const { error } = await lovable.auth.signInWithOAuth(provider, {
+      redirect_uri: window.location.origin,
     });
-    if (error) toast.error(error.message);
+    if (error) toast.error(String(error));
   };
 
   return (
