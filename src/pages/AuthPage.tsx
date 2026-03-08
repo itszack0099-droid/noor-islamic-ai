@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Mail, Lock, Eye, EyeOff, User, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
 
 interface AuthPageProps {
