@@ -1,64 +1,131 @@
-import { Search, Mic } from "lucide-react";
-import { useState } from "react";
+import { Search, Mic, MicOff, Loader2 } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface SearchResult {
+  type: "Quran" | "Hadith";
+  arabic: string;
+  translation: string;
+  reference: string;
+}
 
 const filters = [
   { id: "all", label: "All" },
   { id: "quran", label: "Quran" },
   { id: "hadith", label: "Hadith" },
-  { id: "duas", label: "Duas" },
-  { id: "tafseer", label: "Tafseer" },
 ];
 
-const results = [
-  {
-    type: "Quran",
-    badge: { bg: "rgba(37,165,102,0.15)", color: "#25A566" },
-    arabic: "إِنَّ مَعَ الْعُسْرِ يُسْرًا",
-    translation: "Verily, with every difficulty comes ease. — Al-Inshirah 94:6",
-  },
-  {
-    type: "Hadith",
-    badge: { bg: "rgba(201,168,76,0.15)", color: "#C9A84C" },
-    arabic: "الدُّعَاءُ هُوَ الْعِبَادَةُ",
-    translation: "Supplication is the essence of worship. — Tirmidhi",
-  },
-  {
-    type: "Quran",
-    badge: { bg: "rgba(37,165,102,0.15)", color: "#25A566" },
-    arabic: "وَإِذَا سَأَلَكَ عِبَادِي عَنِّي فَإِنِّي قَرِيبٌ",
-    translation: "And when My servants ask you about Me, indeed I am near. — Al-Baqarah 2:186",
-  },
-  {
-    type: "Hadith",
-    badge: { bg: "rgba(201,168,76,0.15)", color: "#C9A84C" },
-    arabic: "خَيْرُكُمْ مَنْ تَعَلَّمَ الْقُرْآنَ وَعَلَّمَهُ",
-    translation: "The best of you are those who learn the Quran and teach it. — Bukhari",
-  },
+const HADITH_BOOKS = [
+  { name: "Bukhari", key: "bukhari" },
+  { name: "Muslim", key: "muslim" },
+  { name: "Abu Dawood", key: "abudawud" },
+  { name: "Tirmizi", key: "tirmizi" },
+  { name: "Nasai", key: "nasai" },
+  { name: "Ibn Majah", key: "ibnmajah" },
 ];
 
 const SearchScreen = () => {
   const [activeFilter, setActiveFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const [listening, setListening] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const doSearch = useCallback(async (q: string) => {
+    if (!q.trim()) { setResults([]); setSearched(false); return; }
+    setLoading(true);
+    setSearched(true);
+
+    const all: SearchResult[] = [];
+
+    // Quran search
+    try {
+      const res = await fetch(`https://api.alquran.cloud/v1/search/${encodeURIComponent(q)}/all/en.asad`);
+      const data = await res.json();
+      if (data.data?.matches) {
+        for (const m of data.data.matches.slice(0, 20)) {
+          all.push({
+            type: "Quran",
+            arabic: m.text || "",
+            translation: m.edition?.identifier === "en.asad" ? m.text : "",
+            reference: `${m.surah?.englishName || ""} ${m.surah?.number || ""}:${m.numberInSurah || ""}`,
+          });
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Hadith search — check cached data first, then search text client-side
+    for (const book of HADITH_BOOKS) {
+      const cacheKey = `hadith_${book.key}_1`;
+      const cached = localStorage.getItem(cacheKey);
+      if (!cached) continue;
+      try {
+        const items: any[] = JSON.parse(cached);
+        const lq = q.toLowerCase();
+        for (const h of items) {
+          const eng = (h.english || "").toLowerCase();
+          const arb = h.arabic || "";
+          if (eng.includes(lq) || arb.includes(q)) {
+            all.push({
+              type: "Hadith",
+              arabic: arb,
+              translation: h.english || "",
+              reference: `${book.name} #${h.hadithNumber}`,
+            });
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    setResults(all);
+    setLoading(false);
+  }, []);
+
+  const handleInput = (val: string) => {
+    setQuery(val);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => doSearch(val), 500);
+  };
+
+  const handleVoice = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    const recognition = new SR();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.onresult = (e: any) => {
+      const text = e.results[0][0].transcript;
+      setQuery(text);
+      setListening(false);
+      doSearch(text);
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+    setListening(true);
+    recognition.start();
+  };
+
+  const filtered = activeFilter === "all" ? results : results.filter((r) => r.type.toLowerCase() === activeFilter);
 
   return (
     <div style={{ paddingTop: 12, background: "#000", minHeight: "100vh" }}>
       {/* Search Bar */}
       <div className="px-5 pt-3">
-        <div
-          className="flex items-center gap-2 px-4"
-          style={{
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 14,
-            height: 48,
-          }}
-        >
+        <div className="flex items-center gap-2 px-4" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, height: 48 }}>
           <Search size={18} style={{ color: "rgba(255,255,255,0.4)" }} />
           <input
+            value={query}
+            onChange={(e) => handleInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && doSearch(query)}
             className="flex-1 bg-transparent outline-none text-foreground placeholder:text-muted-foreground"
-            placeholder="Search Quran, Hadith, Duas…"
+            placeholder="Search Quran, Hadith…"
             style={{ fontSize: 14 }}
           />
-          <Mic size={18} style={{ color: "#C9A84C" }} />
+          <button onClick={handleVoice}>
+            {listening ? <MicOff size={18} style={{ color: "#ef4444" }} /> : <Mic size={18} style={{ color: "#C9A84C" }} />}
+          </button>
         </div>
       </div>
 
@@ -69,11 +136,7 @@ const SearchScreen = () => {
             key={f.id}
             onClick={() => setActiveFilter(f.id)}
             className="shrink-0 px-4 py-2 rounded-full font-semibold transition-all"
-            style={{
-              fontSize: 12,
-              background: activeFilter === f.id ? "#25A566" : "rgba(255,255,255,0.07)",
-              color: activeFilter === f.id ? "#fff" : "rgba(255,255,255,0.6)",
-            }}
+            style={{ fontSize: 12, background: activeFilter === f.id ? "#25A566" : "rgba(255,255,255,0.07)", color: activeFilter === f.id ? "#fff" : "rgba(255,255,255,0.6)" }}
           >
             {f.label}
           </button>
@@ -82,35 +145,57 @@ const SearchScreen = () => {
 
       {/* Results */}
       <div className="px-5">
-        <span className="uppercase font-semibold" style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", letterSpacing: 1 }}>
-          Results
-        </span>
-        <div className="mt-3 flex flex-col gap-3">
-          {results.map((r, idx) => (
-            <div
-              key={idx}
-              className="p-4"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.06)",
-                borderRadius: 16,
-              }}
-            >
-              <span
-                className="px-2.5 py-0.5 rounded-full font-semibold"
-                style={{ fontSize: 10, background: r.badge.bg, color: r.badge.color }}
-              >
-                {r.type}
-              </span>
-              <p className="font-arabic text-right text-foreground mt-2" dir="rtl" style={{ fontSize: 18, lineHeight: 1.8 }}>
-                {r.arabic}
-              </p>
-              <p className="mt-1" style={{ fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
-                {r.translation}
-              </p>
+        {loading ? (
+          <div className="flex flex-col gap-3 mt-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-4" style={{ background: "rgba(255,255,255,0.04)", borderRadius: 16 }}>
+                <Skeleton className="h-3 w-16 mb-3" />
+                <Skeleton className="h-5 w-full mb-2" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            ))}
+          </div>
+        ) : searched && filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <p className="font-arabic" style={{ fontSize: 28, color: "#C9A84C" }}>لا نتائج</p>
+            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.4)" }}>No results found</p>
+          </div>
+        ) : filtered.length > 0 ? (
+          <>
+            <span className="uppercase font-semibold" style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", letterSpacing: 1 }}>
+              {filtered.length} Result{filtered.length !== 1 ? "s" : ""}
+            </span>
+            <div className="mt-3 flex flex-col gap-3">
+              {filtered.map((r, idx) => (
+                <div key={idx} className="p-4" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16 }}>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full font-semibold" style={{
+                      fontSize: 10,
+                      background: r.type === "Quran" ? "rgba(37,165,102,0.15)" : "rgba(201,168,76,0.15)",
+                      color: r.type === "Quran" ? "#25A566" : "#C9A84C",
+                    }}>
+                      {r.type}
+                    </span>
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{r.reference}</span>
+                  </div>
+                  {r.arabic && (
+                    <p className="font-arabic text-right mt-2" dir="rtl" style={{ fontSize: 18, color: r.type === "Quran" ? "#F0F4F0" : "#F0D080", lineHeight: 1.8 }}>
+                      {r.arabic}
+                    </p>
+                  )}
+                  <p className="mt-1 line-clamp-2" style={{ fontSize: 12.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+                    {r.translation}
+                  </p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        ) : !searched ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2">
+            <Search size={36} style={{ color: "rgba(255,255,255,0.15)" }} />
+            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.3)" }}>Search the Quran & Hadith</p>
+          </div>
+        ) : null}
       </div>
     </div>
   );
