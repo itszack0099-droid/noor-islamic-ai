@@ -14,7 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      hifz_progress: {
+        Row: {
+          ayah_number: number
+          created_at: string
+          id: string
+          last_practiced_at: string | null
+          memorized: boolean
+          peek_count: number
+          surah_number: number
+          user_id: string
+        }
+        Insert: {
+          ayah_number: number
+          created_at?: string
+          id?: string
+          last_practiced_at?: string | null
+          memorized?: boolean
+          peek_count?: number
+          surah_number: number
+          user_id: string
+        }
+        Update: {
+          ayah_number?: number
+          created_at?: string
+          id?: string
+          last_practiced_at?: string | null
+          memorized?: boolean
+          peek_count?: number
+          surah_number?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
