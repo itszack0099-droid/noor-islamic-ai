@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, Mic, Square, Play, Bookmark, Share2, RotateCcw, BookOpen, Eye, CheckCircle, BarChart3 } from "lucide-react";
+import { ChevronLeft, Mic, Square, Play, Bookmark, Share2, RotateCcw, BookOpen, Eye, CheckCircle, BarChart3, ScrollText } from "lucide-react";
+import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -52,6 +53,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [hifzRecords, setHifzRecords] = useState<Record<number, HifzRecord>>({});
   const [showProgress, setShowProgress] = useState(false);
   const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [crossRefAyah, setCrossRefAyah] = useState<{ text: string; reference: string } | null>(null);
 
   // Fetch surahs
   useEffect(() => {
@@ -366,11 +368,22 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                       <button onClick={() => { setActiveAyahIdx(idx); setResult(null); }} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: idx === activeAyahIdx ? "rgba(37,165,102,0.2)" : "rgba(255,255,255,0.07)" }}>
                         <Mic size={14} style={{ color: idx === activeAyahIdx ? "#25A566" : "#fff" }} />
                       </button>
-                      {!hifzMode && [Play, Bookmark, Share2].map((Icon, i) => (
-                        <button key={i} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
-                          <Icon size={14} className="text-foreground" />
-                        </button>
-                      ))}
+                      {!hifzMode && (
+                        <>
+                          <button
+                            onClick={() => setCrossRefAyah({ text: ayah.text, reference: `${selectedSurah.englishName} ${selectedSurah.number}:${ayah.numberInSurah}` })}
+                            className="flex items-center justify-center rounded-full"
+                            style={{ width: 28, height: 28, background: "rgba(201,168,76,0.12)" }}
+                          >
+                            <ScrollText size={14} style={{ color: "#C9A84C" }} />
+                          </button>
+                          {[Play, Bookmark, Share2].map((Icon, i) => (
+                            <button key={i} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
+                              <Icon size={14} className="text-foreground" />
+                            </button>
+                          ))}
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -450,6 +463,14 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
               );
             })}
       </div>
+
+      <CrossReferenceSheet
+        open={!!crossRefAyah}
+        onClose={() => setCrossRefAyah(null)}
+        type="quran_to_hadith"
+        text={crossRefAyah?.text || ""}
+        reference={crossRefAyah?.reference || ""}
+      />
     </div>
   );
 };

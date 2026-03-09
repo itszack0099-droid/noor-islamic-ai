@@ -1,6 +1,7 @@
-import { ChevronLeft, Mic, Volume2, Bookmark, Share2, Search, Loader2 } from "lucide-react";
+import { ChevronLeft, Mic, Volume2, Bookmark, Share2, Search, Loader2, BookOpen } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 
 interface HadithScreenProps {
   onBack: () => void;
@@ -49,6 +50,7 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
   const [pages, setPages] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [crossRefHadith, setCrossRefHadith] = useState<{ text: string; reference: string } | null>(null);
 
   const fetchBook = useCallback(async (bookKey: string, bookName: string, page: number) => {
     try {
@@ -200,13 +202,20 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
                       <span key={t} className="px-2.5 py-1 rounded-full font-semibold" style={{ fontSize: 10, background: "rgba(201,168,76,0.12)", color: "#C9A84C" }}>{t}</span>
                     ))}
                   </div>
-                  <div className="flex gap-2">
-                    {[Volume2, Bookmark, Share2].map((Icon, i) => (
-                      <button key={i} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
-                        <Icon size={14} className="text-foreground" />
-                      </button>
-                    ))}
-                  </div>
+                   <div className="flex gap-2">
+                     <button
+                       onClick={() => setCrossRefHadith({ text: h.english || h.arabic, reference: `${h.book} #${h.hadithNumber}` })}
+                       className="flex items-center justify-center rounded-full"
+                       style={{ width: 28, height: 28, background: "rgba(37,165,102,0.12)" }}
+                     >
+                       <BookOpen size={14} style={{ color: "#25A566" }} />
+                     </button>
+                     {[Volume2, Bookmark, Share2].map((Icon, i) => (
+                       <button key={i} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
+                         <Icon size={14} className="text-foreground" />
+                       </button>
+                     ))}
+                   </div>
                 </div>
               </div>
             ))}
@@ -223,6 +232,14 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
           </button>
         )}
       </div>
+
+      <CrossReferenceSheet
+        open={!!crossRefHadith}
+        onClose={() => setCrossRefHadith(null)}
+        type="hadith_to_quran"
+        text={crossRefHadith?.text || ""}
+        reference={crossRefHadith?.reference || ""}
+      />
     </div>
   );
 };

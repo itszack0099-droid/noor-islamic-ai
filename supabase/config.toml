@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.find-duas]
 verify_jwt = false
+
+[functions.cross-reference]
+verify_jwt = false
