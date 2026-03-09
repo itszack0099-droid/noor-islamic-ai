@@ -24,7 +24,7 @@ const AppShell = () => {
     switch (activeTab) {
       case "home": return <HomeScreen onNavigate={setActiveTab} />;
       case "quran": return <QuranScreen onBack={() => setActiveTab("home")} />;
-      case "hadith": return <HadithScreen onBack={() => setActiveTab("home")} />;
+      case "hadith": return <HadithScreen onBack={() => setActiveTab("home")} onOpenLanguageSettings={() => setActiveTab("lang-settings")} />;
       case "search": return <SearchScreen />;
       case "ai": return <AIChatScreen />;
       case "progress": return <ProgressDashboard onBack={() => setActiveTab("home")} onNavigate={setActiveTab} />;
