@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, Mic, Square, Play, Pause, Bookmark, BookmarkCheck, Share2, RotateCcw, Eye, CheckCircle, BarChart3, ScrollText, Brain, Star, AlertTriangle, Search } from "lucide-react";
+import { ChevronLeft, Mic, Square, Play, Pause, Bookmark, BookmarkCheck, Share2, RotateCcw, Eye, CheckCircle, BarChart3, ScrollText, Brain, Star, AlertTriangle, Search, Volume2, VolumeX } from "lucide-react";
 import VerseIdentifier from "@/components/VerseIdentifier";
 import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 import QuranAudioPlayer from "@/components/QuranAudioPlayer";
@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { addBookmark, removeBookmarkByRef } from "@/components/BookmarksScreen";
 import { toast } from "sonner";
+import { startBeep, stopBeep } from "@/lib/audioFeedback";
 
 interface Surah { number: number; name: string; englishName: string; englishNameTranslation: string; numberOfAyahs: number; revelationType: string; }
 interface Ayah { number: number; numberInSurah: number; text: string; translation: string; secondaryTranslation?: string; }
@@ -184,6 +185,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
       return;
     }
     setResult(null); setListening(true);
+    startBeep();
     const recognition = new SR();
     recognition.lang = "ar-SA"; recognition.interimResults = false; recognition.continuous = false;
     recognitionRef.current = recognition;
@@ -194,17 +196,17 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
       const correct = words.filter(w => w.status === "correct").length;
       setResult({ ayahIdx: activeAyahIdx, words, score: correct, total: words.length });
       setListening(false);
-      // Auto-advance if perfect
+      stopBeep();
       if (correct === words.length && activeAyahIdx < ayahs.length - 1) {
         setTimeout(() => { setActiveAyahIdx(prev => prev + 1); setResult(null); }, 2000);
       }
     };
-    recognition.onerror = () => setListening(false);
+    recognition.onerror = () => { setListening(false); stopBeep(); };
     recognition.onend = () => setListening(false);
     recognition.start();
   }, [ayahs, activeAyahIdx]);
 
-  const stopListening = useCallback(() => { recognitionRef.current?.stop(); setListening(false); }, []);
+  const stopListening = useCallback(() => { recognitionRef.current?.stop(); setListening(false); stopBeep(); }, []);
 
   const memorizedCount = Object.values(hifzRecords).filter(r => r.memorized).length;
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;

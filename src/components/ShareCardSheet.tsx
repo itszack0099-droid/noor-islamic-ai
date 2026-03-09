@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { X, Download, Share2, Image } from "lucide-react";
+import { X, Download, Share2, Image, Copy, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface ShareCardProps {
@@ -32,37 +32,29 @@ function drawGeometricPattern(ctx: CanvasRenderingContext2D, w: number, h: numbe
   ctx.globalAlpha = 0.04;
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
-
   const size = 60;
   const startX = w - size * 5;
-  const startY = 0;
-
   for (let row = 0; row < 6; row++) {
     for (let col = 0; col < 6; col++) {
       const cx = startX + col * size;
-      const cy = startY + row * size;
-      // 8-pointed star pattern
+      const cy = row * size;
       ctx.beginPath();
       for (let i = 0; i < 8; i++) {
         const angle = (i * Math.PI) / 4;
         const r = size * 0.4;
         const x = cx + Math.cos(angle) * r;
         const y = cy + Math.sin(angle) * r;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.closePath();
       ctx.stroke();
-
-      // Inner octagon
       ctx.beginPath();
       for (let i = 0; i < 8; i++) {
         const angle = (i * Math.PI) / 4 + Math.PI / 8;
         const r = size * 0.2;
         const x = cx + Math.cos(angle) * r;
         const y = cy + Math.sin(angle) * r;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.closePath();
       ctx.stroke();
@@ -71,24 +63,7 @@ function drawGeometricPattern(ctx: CanvasRenderingContext2D, w: number, h: numbe
   ctx.restore();
 }
 
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, lineHeight: number): string[] {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const test = current ? current + " " + word : word;
-    if (ctx.measureText(test).width > maxWidth) {
-      if (current) lines.push(current);
-      current = word;
-    } else {
-      current = test;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
-}
-
-function wrapTextRTL(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(" ");
   const lines: string[] = [];
   let current = "";
@@ -106,13 +81,8 @@ function wrapTextRTL(ctx: CanvasRenderingContext2D, text: string, maxWidth: numb
 }
 
 function renderCard(
-  canvas: HTMLCanvasElement,
-  arabic: string,
-  translation: string,
-  reference: string,
-  type: "Quran" | "Hadith",
-  size: typeof SIZES[number],
-  theme: typeof THEMES[number]
+  canvas: HTMLCanvasElement, arabic: string, translation: string, reference: string,
+  type: "Quran" | "Hadith", size: typeof SIZES[number], theme: typeof THEMES[number]
 ) {
   const { w, h } = size;
   canvas.width = w;
@@ -121,17 +91,14 @@ function renderCard(
   const scale = Math.min(w, h) / 1080;
   const pad = 80 * scale;
 
-  // Background gradient
   const grad = ctx.createLinearGradient(0, 0, w * 0.3, h);
   grad.addColorStop(0, theme.bg1);
   grad.addColorStop(1, theme.bg2);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
-  // Geometric pattern in top-right
   drawGeometricPattern(ctx, w, h, theme.accent);
 
-  // Gold border
   ctx.strokeStyle = theme.accent;
   ctx.globalAlpha = 0.3;
   ctx.lineWidth = 3 * scale;
@@ -141,7 +108,6 @@ function renderCard(
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Decorative line
   const lineY = h * 0.15;
   ctx.strokeStyle = theme.accent;
   ctx.globalAlpha = 0.15;
@@ -152,7 +118,6 @@ function renderCard(
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Bismillah ornament for Quran
   if (type === "Quran") {
     ctx.font = `${28 * scale}px Amiri, serif`;
     ctx.fillStyle = theme.accent;
@@ -162,7 +127,6 @@ function renderCard(
     ctx.globalAlpha = 1;
   }
 
-  // Arabic text
   const arabicFontSize = Math.min(48 * scale, (w - pad * 2) / (arabic.length / 15 + 1));
   const arabicSize = Math.max(28 * scale, Math.min(52 * scale, arabicFontSize));
   ctx.font = `700 ${arabicSize}px Amiri, serif`;
@@ -171,11 +135,9 @@ function renderCard(
   ctx.direction = "rtl";
 
   const maxTextWidth = w - pad * 2.5;
-  const arabicLines = wrapTextRTL(ctx, arabic, maxTextWidth);
+  const arabicLines = wrapText(ctx, arabic, maxTextWidth);
   const arabicLineHeight = arabicSize * 1.9;
   const totalArabicHeight = arabicLines.length * arabicLineHeight;
-
-  // Center vertically
   const contentStart = (h - totalArabicHeight - 120 * scale) / 2;
   let currentY = contentStart;
 
@@ -184,7 +146,6 @@ function renderCard(
     currentY += arabicLineHeight;
   }
 
-  // Separator
   currentY += 20 * scale;
   ctx.strokeStyle = theme.accent;
   ctx.globalAlpha = 0.2;
@@ -197,27 +158,24 @@ function renderCard(
   ctx.globalAlpha = 1;
   currentY += 30 * scale;
 
-  // Translation
   const transFontSize = 22 * scale;
   ctx.font = `400 ${transFontSize}px 'Plus Jakarta Sans', sans-serif`;
   ctx.fillStyle = "rgba(255,255,255,0.8)";
   ctx.textAlign = "center";
   ctx.direction = "ltr";
 
-  const transLines = wrapText(ctx, translation, maxTextWidth, transFontSize * 1.6);
+  const transLines = wrapText(ctx, translation, maxTextWidth);
   for (const line of transLines) {
     ctx.fillText(line, w / 2, currentY + transFontSize);
     currentY += transFontSize * 1.6;
   }
 
-  // Reference (bottom left)
   const bottomY = h - pad * 0.8;
   ctx.font = `500 ${16 * scale}px 'Plus Jakarta Sans', sans-serif`;
   ctx.fillStyle = "rgba(255,255,255,0.35)";
   ctx.textAlign = "left";
   ctx.fillText(reference, pad, bottomY);
 
-  // Type badge
   const badgeColor = type === "Quran" ? "#25A566" : theme.accent;
   ctx.fillStyle = badgeColor;
   ctx.globalAlpha = 0.2;
@@ -232,7 +190,6 @@ function renderCard(
   ctx.font = `600 ${12 * scale}px 'Plus Jakarta Sans', sans-serif`;
   ctx.fillText(type, badgeX + 10 * scale, badgeY + 16 * scale);
 
-  // NoorAI watermark (bottom right)
   ctx.font = `700 ${18 * scale}px 'Plus Jakarta Sans', sans-serif`;
   ctx.fillStyle = "rgba(255,255,255,0.2)";
   ctx.textAlign = "right";
@@ -262,10 +219,30 @@ const ShareCardSheet = ({ open, onClose, arabic, translation, reference, type }:
     link.download = `noorai-${type.toLowerCase()}-${ratio.replace(":", "x")}.png`;
     link.href = canvasRef.current.toDataURL("image/png");
     link.click();
-    toast.success("Image saved!");
+    toast.success("Image saved! 📥");
   };
 
-  const handleShare = async () => {
+  const handleCopy = async () => {
+    const shareText = `${arabic}\n\n${translation}\n\n— ${reference}\n\nShared via NoorAI`;
+    try {
+      await navigator.clipboard.writeText(shareText);
+      toast.success("Copied! ✅");
+    } catch {
+      toast.error("Could not copy");
+    }
+  };
+
+  const handleWhatsApp = () => {
+    const text = `${arabic}\n\n${translation}\n\n— ${reference}\n\nShared via NoorAI`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  };
+
+  const handleTwitter = () => {
+    const text = `${arabic}\n${translation}\n\nvia @NoorAI_App`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank");
+  };
+
+  const handleNativeShare = async () => {
     if (!canvasRef.current) return;
     try {
       const blob = await new Promise<Blob>((resolve) =>
@@ -273,7 +250,9 @@ const ShareCardSheet = ({ open, onClose, arabic, translation, reference, type }:
       );
       const file = new File([blob], `noorai-${type.toLowerCase()}.png`, { type: "image/png" });
       if (navigator.share && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: `${type} - NoorAI` });
+        await navigator.share({ files: [file], title: `${type} - NoorAI`, text: `${arabic}\n${translation}` });
+      } else if (navigator.share) {
+        await navigator.share({ title: "NoorAI", text: `${arabic}\n\n${translation}\n\n— ${reference}`, url: "https://noorai.app" });
       } else {
         handleDownload();
       }
@@ -290,28 +269,17 @@ const ShareCardSheet = ({ open, onClose, arabic, translation, reference, type }:
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} />
-
-      <div
-        className="relative w-full animate-slide-up"
-        style={{ maxWidth: 393, maxHeight: "90vh" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          className="rounded-t-3xl overflow-hidden"
-          style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderBottom: "none" }}
-        >
-          {/* Handle */}
+      <div className="relative w-full animate-slide-up" style={{ maxWidth: 393, maxHeight: "90vh" }} onClick={(e) => e.stopPropagation()}>
+        <div className="rounded-t-3xl overflow-hidden" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderBottom: "none" }}>
           <div className="flex justify-center pt-3 pb-1">
             <div className="w-10 h-1 rounded-full" style={{ background: "hsl(var(--muted-foreground) / 0.3)" }} />
           </div>
-
-          {/* Header */}
           <div className="flex items-center justify-between px-5 pb-3">
             <div className="flex items-center gap-2">
               <Image size={18} style={{ color: "hsl(var(--accent))" }} />
               <p className="font-bold text-foreground" style={{ fontSize: 16 }}>Share as Card</p>
             </div>
-            <button onClick={onClose} className="flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: "hsl(var(--muted))" }}>
+            <button onClick={onClose} className="flex items-center justify-center rounded-full transition-all active:scale-90" style={{ width: 32, height: 32, background: "hsl(var(--muted))" }}>
               <X size={16} className="text-muted-foreground" />
             </button>
           </div>
@@ -320,10 +288,7 @@ const ShareCardSheet = ({ open, onClose, arabic, translation, reference, type }:
             {/* Preview */}
             <div className="flex justify-center mb-4">
               <div style={{ width: previewW, height: Math.min(previewH, 400), overflow: "hidden", borderRadius: 12, border: "1px solid hsl(var(--border))" }}>
-                <canvas
-                  ref={canvasRef}
-                  style={{ width: previewW, height: previewH, objectFit: "contain" }}
-                />
+                <canvas ref={canvasRef} style={{ width: previewW, height: previewH, objectFit: "contain" }} />
               </div>
             </div>
 
@@ -332,17 +297,12 @@ const ShareCardSheet = ({ open, onClose, arabic, translation, reference, type }:
               <p className="text-muted-foreground mb-2" style={{ fontSize: 11 }}>Size</p>
               <div className="flex gap-2">
                 {SIZES.map((s) => (
-                  <button
-                    key={s.key}
-                    onClick={() => setRatio(s.key)}
-                    className="flex-1 py-2 rounded-xl font-semibold"
-                    style={{
-                      fontSize: 12,
-                      background: ratio === s.key ? "hsl(var(--accent) / 0.15)" : "hsl(var(--muted))",
-                      color: ratio === s.key ? "hsl(var(--accent))" : "hsl(var(--muted-foreground))",
-                      border: `1px solid ${ratio === s.key ? "hsl(var(--accent) / 0.3)" : "hsl(var(--border))"}`,
-                    }}
-                  >
+                  <button key={s.key} onClick={() => setRatio(s.key)} className="flex-1 py-2 rounded-xl font-semibold transition-all active:scale-95" style={{
+                    fontSize: 12,
+                    background: ratio === s.key ? "hsl(var(--accent) / 0.15)" : "hsl(var(--muted))",
+                    color: ratio === s.key ? "hsl(var(--accent))" : "hsl(var(--muted-foreground))",
+                    border: `1px solid ${ratio === s.key ? "hsl(var(--accent) / 0.3)" : "hsl(var(--border))"}`,
+                  }}>
                     {s.label}
                   </button>
                 ))}
@@ -354,48 +314,28 @@ const ShareCardSheet = ({ open, onClose, arabic, translation, reference, type }:
               <p className="text-muted-foreground mb-2" style={{ fontSize: 11 }}>Theme</p>
               <div className="flex gap-2">
                 {THEMES.map((t) => (
-                  <button
-                    key={t.key}
-                    onClick={() => setTheme(t.key)}
-                    className="flex-1 py-2 rounded-xl font-semibold"
-                    style={{
-                      fontSize: 11,
-                      background: theme === t.key ? t.bg2 : "hsl(var(--muted))",
-                      color: theme === t.key ? t.accent : "hsl(var(--muted-foreground))",
-                      border: `1px solid ${theme === t.key ? t.accent + "4D" : "hsl(var(--border))"}`,
-                    }}
-                  >
+                  <button key={t.key} onClick={() => setTheme(t.key)} className="flex-1 py-2 rounded-xl font-semibold transition-all active:scale-95" style={{
+                    fontSize: 11,
+                    background: theme === t.key ? t.bg2 : "hsl(var(--muted))",
+                    color: theme === t.key ? t.accent : "hsl(var(--muted-foreground))",
+                    border: `1px solid ${theme === t.key ? t.accent + "4D" : "hsl(var(--border))"}`,
+                  }}>
                     {t.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleDownload}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold"
-                style={{
-                  fontSize: 13,
-                  background: "hsl(var(--muted))",
-                  color: "hsl(var(--foreground))",
-                  border: "1px solid hsl(var(--border))",
-                }}
-              >
-                <Download size={16} /> Download
-              </button>
-              <button
-                onClick={handleShare}
-                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold"
-                style={{
-                  fontSize: 13,
-                  background: "hsl(var(--primary))",
-                  color: "hsl(var(--primary-foreground))",
-                }}
-              >
-                <Share2 size={16} /> Share
-              </button>
+            {/* Share Buttons Row */}
+            <div className="mb-4">
+              <p className="text-muted-foreground mb-2" style={{ fontSize: 11 }}>Share via</p>
+              <div className="flex gap-2">
+                <ShareButton icon="💬" label="WhatsApp" color="#25D366" onClick={handleWhatsApp} />
+                <ShareButton icon="𝕏" label="Twitter" color="#1DA1F2" onClick={handleTwitter} />
+                <ShareButton icon={<Copy size={16} />} label="Copy" color="rgba(255,255,255,0.5)" onClick={handleCopy} />
+                <ShareButton icon={<Download size={16} />} label="Save" color="hsl(var(--accent))" onClick={handleDownload} />
+                <ShareButton icon={<Share2 size={16} />} label="More" color="hsl(var(--foreground))" onClick={handleNativeShare} />
+              </div>
             </div>
           </div>
         </div>
@@ -403,5 +343,14 @@ const ShareCardSheet = ({ open, onClose, arabic, translation, reference, type }:
     </div>
   );
 };
+
+function ShareButton({ icon, label, color, onClick }: { icon: any; label: string; color: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl transition-all active:scale-90" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <span style={{ color, fontSize: typeof icon === "string" ? 18 : undefined }}>{icon}</span>
+      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.5)" }}>{label}</span>
+    </button>
+  );
+}
 
 export default ShareCardSheet;

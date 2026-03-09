@@ -9,6 +9,7 @@ import ProgressDashboard from "../pages/ProgressDashboard";
 import NotificationSettingsScreen from "./NotificationSettings";
 import LanguageSettings from "./LanguageSettings";
 import BookmarksScreen from "./BookmarksScreen";
+import ProfileScreen from "./ProfileScreen";
 import { startNotificationScheduler } from "@/lib/notificationScheduler";
 import { useI18n } from "@/lib/i18n";
 
@@ -31,6 +32,7 @@ const AppShell = () => {
       case "notif-settings": return <NotificationSettingsScreen onBack={() => setActiveTab("home")} />;
       case "lang-settings": return <LanguageSettings onBack={() => setActiveTab("home")} />;
       case "bookmarks": return <BookmarksScreen onBack={() => setActiveTab("home")} />;
+      case "profile": return <ProfileScreen onBack={() => setActiveTab("home")} onNavigate={setActiveTab} />;
       default: return <HomeScreen onNavigate={setActiveTab} />;
     }
   };

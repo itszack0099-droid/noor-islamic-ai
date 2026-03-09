@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Share2, Globe, Settings2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Share2, Globe, Settings2, X, Volume2, VolumeX } from "lucide-react";
 import { useState, useEffect, useCallback, useRef, TouchEvent } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import ShareCardSheet from "@/components/ShareCardSheet";
@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { addBookmark, removeBookmarkByRef } from "@/components/BookmarksScreen";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { speakText, stopSpeaking } from "@/lib/audioFeedback";
 
 interface HadithScreenProps {
   onBack: () => void;
@@ -107,6 +108,7 @@ const HadithScreen = ({ onBack, onOpenLanguageSettings }: HadithScreenProps) => 
   const [fontSize, setFontSize] = useState(20);
   const [showArabic, setShowArabic] = useState(true);
   const [showTranslation, setShowTranslation] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const bookInfo = BOOKS.find(b => b.key === currentBook) || BOOKS[0];
 
@@ -432,7 +434,7 @@ const HadithScreen = ({ onBack, onOpenLanguageSettings }: HadithScreenProps) => 
               <div className="flex gap-2">
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleBookmark(); }}
-                  className="flex items-center justify-center rounded-full w-8 h-8"
+                  className="flex items-center justify-center rounded-full w-8 h-8 transition-all active:scale-90"
                   style={{ background: isBookmarked ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.07)" }}
                 >
                   {isBookmarked 
@@ -445,14 +447,41 @@ const HadithScreen = ({ onBack, onOpenLanguageSettings }: HadithScreenProps) => 
                     e.stopPropagation(); 
                     setShareHadith({ arabic: currentHadith.arabic, translation: currentHadith.translation, reference }); 
                   }}
-                  className="flex items-center justify-center rounded-full w-8 h-8"
+                  className="flex items-center justify-center rounded-full w-8 h-8 transition-all active:scale-90"
                   style={{ background: "rgba(255,255,255,0.07)" }}
                 >
                   <Share2 size={14} className="text-foreground" />
                 </button>
                 <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isSpeaking) {
+                      stopSpeaking();
+                      setIsSpeaking(false);
+                    } else {
+                      setIsSpeaking(true);
+                      const u = speakText(currentHadith.arabic, "arabic");
+                      if (u) {
+                        u.onend = () => {
+                          // Speak translation after Arabic
+                          const u2 = speakText(currentHadith.translation, "english");
+                          if (u2) u2.onend = () => setIsSpeaking(false);
+                          else setIsSpeaking(false);
+                        };
+                      } else setIsSpeaking(false);
+                    }
+                  }}
+                  className="flex items-center justify-center rounded-full w-8 h-8 transition-all active:scale-90"
+                  style={{ background: isSpeaking ? "rgba(37,165,102,0.25)" : "rgba(255,255,255,0.07)" }}
+                >
+                  {isSpeaking
+                    ? <VolumeX size={14} style={{ color: "#25A566" }} />
+                    : <Volume2 size={14} className="text-foreground" />
+                  }
+                </button>
+                <button
                   onClick={(e) => { e.stopPropagation(); setShowSettings(true); }}
-                  className="flex items-center justify-center rounded-full w-8 h-8"
+                  className="flex items-center justify-center rounded-full w-8 h-8 transition-all active:scale-90"
                   style={{ background: "rgba(255,255,255,0.07)" }}
                 >
                   <Settings2 size={14} className="text-foreground" />
