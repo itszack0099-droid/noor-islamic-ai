@@ -220,7 +220,9 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
               <ChevronLeft size={20} className="text-foreground" />
             </button>
             <h2 className="text-foreground font-bold" style={{ fontSize: 20 }}>{t("quran")}</h2>
-            <div style={{ width: 36 }} />
+            <button onClick={() => setShowIdentifier(true)} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
+              <Search size={18} className="text-foreground" />
+            </button>
           </div>
         </div>
         <div className="px-4 py-3">
@@ -243,8 +245,8 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                 </button>
               ))}
         </div>
+        <VerseIdentifier open={showIdentifier} onClose={() => setShowIdentifier(false)} mode="quran" onOpenInQuran={handleOpenInQuran} />
       </div>
-    );
   }
 
   // =================== HIFZ PROGRESS ===================
@@ -344,7 +346,9 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
           </button>
           <h2 className="text-foreground font-bold" style={{ fontSize: 20 }}>{selectedSurah.englishName}</h2>
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowProgress(true)} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
+            <button onClick={() => setShowIdentifier(true)} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
+              <Search size={16} className="text-foreground" />
+            </button>
               <BarChart3 size={16} className="text-foreground" />
             </button>
             <button
@@ -657,6 +661,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
 
       <CrossReferenceSheet open={!!crossRefAyah} onClose={() => setCrossRefAyah(null)} type="quran_to_hadith" text={crossRefAyah?.text || ""} reference={crossRefAyah?.reference || ""} />
       <ShareCardSheet open={!!shareAyah} onClose={() => setShareAyah(null)} arabic={shareAyah?.arabic || ""} translation={shareAyah?.translation || ""} reference={shareAyah?.reference || ""} type="Quran" />
+      <VerseIdentifier open={showIdentifier} onClose={() => setShowIdentifier(false)} mode="quran" onOpenInQuran={handleOpenInQuran} />
     </div>
   );
 };
