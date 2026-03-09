@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, Mic, Square, Play, Pause, Bookmark, BookmarkCheck, Share2, RotateCcw, Eye, CheckCircle, BarChart3, ScrollText, Brain, Star, AlertTriangle } from "lucide-react";
+import { ChevronLeft, Mic, Square, Play, Pause, Bookmark, BookmarkCheck, Share2, RotateCcw, Eye, CheckCircle, BarChart3, ScrollText, Brain, Star, AlertTriangle, Search } from "lucide-react";
+import VerseIdentifier from "@/components/VerseIdentifier";
 import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 import QuranAudioPlayer from "@/components/QuranAudioPlayer";
 import ShareCardSheet from "@/components/ShareCardSheet";
@@ -70,6 +71,15 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [audioAyahIdx, setAudioAyahIdx] = useState<number | null>(null);
   const [shareAyah, setShareAyah] = useState<{ arabic: string; translation: string; reference: string } | null>(null);
   const [bookmarkedRefs, setBookmarkedRefs] = useState<Set<string>>(new Set());
+  const [showIdentifier, setShowIdentifier] = useState(false);
+
+  const handleOpenInQuran = (surahNum: number, _ayahNum: number) => {
+    const surah = surahs.find(s => s.number === surahNum);
+    if (surah) {
+      setSelectedSurah(surah);
+      setShowIdentifier(false);
+    }
+  };
 
   // Fetch surahs
   useEffect(() => {
