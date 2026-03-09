@@ -434,7 +434,7 @@ const HadithScreen = ({ onBack, onOpenLanguageSettings }: HadithScreenProps) => 
               <div className="flex gap-2">
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleBookmark(); }}
-                  className="flex items-center justify-center rounded-full w-8 h-8"
+                  className="flex items-center justify-center rounded-full w-8 h-8 transition-all active:scale-90"
                   style={{ background: isBookmarked ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.07)" }}
                 >
                   {isBookmarked 
@@ -447,10 +447,8 @@ const HadithScreen = ({ onBack, onOpenLanguageSettings }: HadithScreenProps) => 
                     e.stopPropagation(); 
                     setShareHadith({ arabic: currentHadith.arabic, translation: currentHadith.translation, reference }); 
                   }}
-                  className="flex items-center justify-center rounded-full w-8 h-8"
+                  className="flex items-center justify-center rounded-full w-8 h-8 transition-all active:scale-90"
                   style={{ background: "rgba(255,255,255,0.07)" }}
-                >
-                  <Share2 size={14} className="text-foreground" />
                 </button>
                 <button
                   onClick={(e) => {
