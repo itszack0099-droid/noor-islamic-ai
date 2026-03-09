@@ -1,6 +1,7 @@
-import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, MapPin, Search, Loader2, BarChart3, Settings } from "lucide-react";
+import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, MapPin, Search, Loader2, BarChart3, Settings, Globe, Bookmark } from "lucide-react";
 import { useState, useEffect } from "react";
 import NotificationCenter, { getUnreadCount } from "@/components/NotificationCenter";
+import { useI18n } from "@/lib/i18n";
 
 interface HomeScreenProps {
   onNavigate: (tab: string) => void;
@@ -44,18 +45,15 @@ function computeActive(timings: Record<string, string>): { prayers: PrayerTime[]
     mins: to24((timings[k] || "0:0").replace(/ \(.*\)/, "")),
   }));
 
-  // Find current active prayer (the last prayer whose time has passed)
   let activeIdx = -1;
   for (let i = pts.length - 1; i >= 0; i--) {
     if (nowMins >= pts[i].mins) { activeIdx = i; break; }
   }
 
-  // Next prayer
   let nextIdx = pts.findIndex((p) => p.mins > nowMins);
   let nextIn = 0;
   let nextLabel = "";
   if (nextIdx === -1) {
-    // After Isha — next is tomorrow's Fajr
     nextLabel = "Fajr";
     nextIn = 24 * 60 - nowMins + pts[0].mins;
   } else {
@@ -71,6 +69,7 @@ function computeActive(timings: Record<string, string>): { prayers: PrayerTime[]
 }
 
 const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
+  const { t, isRtl, currentLanguage } = useI18n();
   const [prayers, setPrayers] = useState<PrayerTime[]>([]);
   const [nextPrayer, setNextPrayer] = useState({ label: "", time: "" });
   const [locationDenied, setLocationDenied] = useState(false);
@@ -123,7 +122,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
   }, []);
 
   return (
-    <div className="px-5 pt-5">
+    <div className="px-5 pt-5" dir={isRtl ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -133,6 +132,12 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
         <div className="flex gap-2">
           <button onClick={() => onNavigate("progress")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(37,165,102,0.15)" }}>
             <BarChart3 size={18} style={{ color: "#25A566" }} />
+          </button>
+          <button onClick={() => onNavigate("bookmarks")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(201,168,76,0.15)" }}>
+            <Bookmark size={18} style={{ color: "#C9A84C" }} />
+          </button>
+          <button onClick={() => onNavigate("lang-settings")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
+            <Globe size={18} className="text-foreground" />
           </button>
           <button onClick={() => onNavigate("notif-settings")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
             <Settings size={18} className="text-foreground" />
@@ -154,7 +159,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <MapPin size={14} style={{ color: "rgba(255,255,255,0.4)" }} />
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Enter your city for prayer times</span>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{t("enterCity")}</span>
             </div>
             <div className="flex gap-2">
               <input
@@ -173,7 +178,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
         ) : loadingPrayer ? (
           <div className="flex items-center justify-center py-2 gap-2">
             <Loader2 size={16} className="animate-spin" style={{ color: "#25A566" }} />
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Fetching prayer times…</span>
+            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{t("fetchingPrayer")}</span>
           </div>
         ) : (
           <>
@@ -201,21 +206,21 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
       <div className="mt-4" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 20 }}>
         <div className="flex items-center gap-2 mb-3">
           <span className="rounded-full" style={{ width: 6, height: 6, background: "#C9A84C" }} />
-          <span className="uppercase font-semibold" style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1 }}>Ayah of the Day</span>
+          <span className="uppercase font-semibold" style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1 }}>{t("ayahOfDay")}</span>
         </div>
         <p className="font-arabic text-right" dir="rtl" style={{ fontSize: 24, color: "#F0D080", lineHeight: 1.8 }}>إِنَّ مَعَ الْعُسْرِ يُسْرًا</p>
         <p className="mt-2" style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Verily, with every difficulty comes ease.</p>
         <div className="flex items-center justify-between mt-4">
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>Al-Inshirah 94:6</span>
           <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ border: "1px solid #C9A84C", color: "#C9A84C", fontSize: 12, fontWeight: 600 }}>
-            Share <Share2 size={12} />
+            {t("share")} <Share2 size={12} />
           </button>
         </div>
       </div>
 
       {/* Streak */}
       <div className="mt-5">
-        <span className="uppercase font-semibold" style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1 }}>🔥 7-Day Streak</span>
+        <span className="uppercase font-semibold" style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: 1 }}>🔥 {t("streak")}</span>
         <div className="flex items-center justify-between mt-3 gap-2">
           {streakDays.map((d, i) => (
             <div key={i} className="flex flex-col items-center justify-center font-semibold" style={{ width: 40, height: 48, borderRadius: 10, fontSize: 11, background: d.today ? "#25A566" : d.done ? "#C9A84C" : "rgba(255,255,255,0.06)", color: d.done || d.today ? "#fff" : "rgba(255,255,255,0.3)", ...(d.today ? { animation: "pulse-green 2s cubic-bezier(0.4,0,0.6,1) infinite" } : {}) }}>
@@ -231,7 +236,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
       <div className="grid grid-cols-2 gap-3 mt-4">
         <button onClick={() => onNavigate("quran")} className="text-left p-4 active:scale-[0.96] transition-transform" style={{ background: "linear-gradient(135deg, #1A2820, #0D4D2E)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20 }}>
           <BookOpen size={24} className="text-primary mb-2" />
-          <p className="text-foreground font-bold" style={{ fontSize: 15 }}>Quran</p>
+          <p className="text-foreground font-bold" style={{ fontSize: 15 }}>{t("quran")}</p>
           <p className="text-muted-foreground" style={{ fontSize: 11, marginTop: 2 }}>Al-Baqarah • Ayah 45</p>
           <div className="mt-3 rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.08)" }}>
             <div className="h-full rounded-full" style={{ width: "34%", background: "#25A566" }} />
@@ -239,7 +244,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
         </button>
         <button onClick={() => onNavigate("hadith")} className="text-left p-4 active:scale-[0.96] transition-transform" style={{ background: "linear-gradient(135deg, #1A1008, #3D1A00)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20 }}>
           <ScrollText size={24} className="text-accent mb-2" />
-          <p className="text-foreground font-bold" style={{ fontSize: 15 }}>Hadith</p>
+          <p className="text-foreground font-bold" style={{ fontSize: 15 }}>{t("hadith")}</p>
           <p className="text-muted-foreground" style={{ fontSize: 11, marginTop: 2 }}>Bukhari • 1,124 read</p>
           <div className="mt-3 rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.08)" }}>
             <div className="h-full rounded-full" style={{ width: "18%", background: "#C9A84C" }} />
@@ -253,8 +258,8 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
           <Bot size={22} className="text-foreground" />
         </div>
         <div className="flex-1 text-left">
-          <p className="text-foreground font-bold" style={{ fontSize: 15 }}>NoorAI Scholar</p>
-          <p className="text-muted-foreground" style={{ fontSize: 12 }}>Ask anything about Quran & Hadith</p>
+          <p className="text-foreground font-bold" style={{ fontSize: 15 }}>{t("nooraiScholar")}</p>
+          <p className="text-muted-foreground" style={{ fontSize: 12 }}>{t("askAnything")}</p>
         </div>
         <ChevronRight size={18} style={{ color: "rgba(255,255,255,0.2)" }} />
       </button>

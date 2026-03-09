@@ -1,19 +1,22 @@
 import { Home, BookOpen, ScrollText, Search, Bot } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 interface TabBarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
 
-const tabs = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "quran", label: "Quran", icon: BookOpen },
-  { id: "hadith", label: "Hadith", icon: ScrollText },
-  { id: "search", label: "Search", icon: Search },
-  { id: "ai", label: "AI", icon: Bot },
-];
-
 const TabBar = ({ activeTab, onTabChange }: TabBarProps) => {
+  const { t } = useI18n();
+
+  const tabs = [
+    { id: "home", label: t("home"), icon: Home },
+    { id: "quran", label: t("quran"), icon: BookOpen },
+    { id: "hadith", label: t("hadith"), icon: ScrollText },
+    { id: "search", label: t("search"), icon: Search },
+    { id: "ai", label: t("ai"), icon: Bot },
+  ];
+
   return (
     <div
       className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full glass-dark z-50"
