@@ -373,13 +373,20 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                       {!hifzMode && (
                         <>
                           <button
+                            onClick={() => setAudioAyahIdx(audioAyahIdx === idx ? null : idx)}
+                            className="flex items-center justify-center rounded-full"
+                            style={{ width: 28, height: 28, background: audioAyahIdx === idx ? "rgba(37,165,102,0.25)" : "rgba(255,255,255,0.07)" }}
+                          >
+                            {audioAyahIdx === idx ? <Pause size={14} style={{ color: "#25A566" }} /> : <Play size={14} className="text-foreground" />}
+                          </button>
+                          <button
                             onClick={() => setCrossRefAyah({ text: ayah.text, reference: `${selectedSurah.englishName} ${selectedSurah.number}:${ayah.numberInSurah}` })}
                             className="flex items-center justify-center rounded-full"
                             style={{ width: 28, height: 28, background: "rgba(201,168,76,0.12)" }}
                           >
                             <ScrollText size={14} style={{ color: "#C9A84C" }} />
                           </button>
-                          {[Play, Bookmark, Share2].map((Icon, i) => (
+                          {[Bookmark, Share2].map((Icon, i) => (
                             <button key={i} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
                               <Icon size={14} className="text-foreground" />
                             </button>
