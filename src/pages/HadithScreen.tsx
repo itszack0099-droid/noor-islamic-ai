@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Share2, Globe, Settings2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Bookmark, BookmarkCheck, Share2, Globe, Settings2, X, Volume2, VolumeX } from "lucide-react";
 import { useState, useEffect, useCallback, useRef, TouchEvent } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import ShareCardSheet from "@/components/ShareCardSheet";
@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { addBookmark, removeBookmarkByRef } from "@/components/BookmarksScreen";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { speakText, stopSpeaking } from "@/lib/audioFeedback";
 
 interface HadithScreenProps {
   onBack: () => void;
