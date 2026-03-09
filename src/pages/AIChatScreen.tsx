@@ -2,7 +2,6 @@ import { Send, Bot, Sparkles } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import DuaFinder from "@/components/DuaFinder";
-import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
