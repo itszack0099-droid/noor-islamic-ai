@@ -53,6 +53,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [hifzRecords, setHifzRecords] = useState<Record<number, HifzRecord>>({});
   const [showProgress, setShowProgress] = useState(false);
   const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [crossRefAyah, setCrossRefAyah] = useState<{ text: string; reference: string } | null>(null);
 
   // Fetch surahs
   useEffect(() => {
