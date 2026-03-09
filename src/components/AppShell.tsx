@@ -6,9 +6,15 @@ import HadithScreen from "../pages/HadithScreen";
 import SearchScreen from "../pages/SearchScreen";
 import AIChatScreen from "../pages/AIChatScreen";
 import ProgressDashboard from "../pages/ProgressDashboard";
+import NotificationSettingsScreen from "./NotificationSettings";
+import { startNotificationScheduler } from "@/lib/notificationScheduler";
 
 const AppShell = () => {
   const [activeTab, setActiveTab] = useState("home");
+
+  useEffect(() => {
+    startNotificationScheduler();
+  }, []);
 
   const renderScreen = () => {
     switch (activeTab) {
@@ -18,6 +24,7 @@ const AppShell = () => {
       case "search": return <SearchScreen />;
       case "ai": return <AIChatScreen />;
       case "progress": return <ProgressDashboard onBack={() => setActiveTab("home")} onNavigate={setActiveTab} />;
+      case "notif-settings": return <NotificationSettingsScreen onBack={() => setActiveTab("home")} />;
       default: return <HomeScreen onNavigate={setActiveTab} />;
     }
   };

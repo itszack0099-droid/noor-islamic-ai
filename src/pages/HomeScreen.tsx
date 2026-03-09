@@ -1,5 +1,6 @@
-import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, MapPin, Search, Loader2, BarChart3 } from "lucide-react";
+import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, MapPin, Search, Loader2, BarChart3, Settings } from "lucide-react";
 import { useState, useEffect } from "react";
+import NotificationCenter, { getUnreadCount } from "@/components/NotificationCenter";
 
 interface HomeScreenProps {
   onNavigate: (tab: string) => void;
@@ -75,6 +76,14 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
   const [locationDenied, setLocationDenied] = useState(false);
   const [cityQuery, setCityQuery] = useState("");
   const [loadingPrayer, setLoadingPrayer] = useState(true);
+  const [showNotifCenter, setShowNotifCenter] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    setUnreadCount(getUnreadCount());
+    const interval = setInterval(() => setUnreadCount(getUnreadCount()), 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchTimings = async (lat: number, lng: number) => {
     try {
@@ -125,8 +134,16 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
           <button onClick={() => onNavigate("progress")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(37,165,102,0.15)" }}>
             <BarChart3 size={18} style={{ color: "#25A566" }} />
           </button>
-          <button className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
+          <button onClick={() => onNavigate("notif-settings")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
+            <Settings size={18} className="text-foreground" />
+          </button>
+          <button onClick={() => { setShowNotifCenter(true); setUnreadCount(0); }} className="relative flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
             <Bell size={18} className="text-foreground" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center rounded-full font-bold" style={{ width: 18, height: 18, fontSize: 9, background: "hsl(var(--destructive))", color: "white" }}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -241,6 +258,8 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
         </div>
         <ChevronRight size={18} style={{ color: "rgba(255,255,255,0.2)" }} />
       </button>
+
+      <NotificationCenter open={showNotifCenter} onClose={() => setShowNotifCenter(false)} />
     </div>
   );
 };
