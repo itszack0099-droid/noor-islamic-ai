@@ -449,6 +449,8 @@ const HadithScreen = ({ onBack, onOpenLanguageSettings }: HadithScreenProps) => 
                   }}
                   className="flex items-center justify-center rounded-full w-8 h-8 transition-all active:scale-90"
                   style={{ background: "rgba(255,255,255,0.07)" }}
+                >
+                  <Share2 size={14} className="text-foreground" />
                 </button>
                 <button
                   onClick={(e) => {
