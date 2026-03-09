@@ -453,8 +453,35 @@ const HadithScreen = ({ onBack, onOpenLanguageSettings }: HadithScreenProps) => 
                   <Share2 size={14} className="text-foreground" />
                 </button>
                 <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isSpeaking) {
+                      stopSpeaking();
+                      setIsSpeaking(false);
+                    } else {
+                      setIsSpeaking(true);
+                      const u = speakText(currentHadith.arabic, "arabic");
+                      if (u) {
+                        u.onend = () => {
+                          // Speak translation after Arabic
+                          const u2 = speakText(currentHadith.translation, "english");
+                          if (u2) u2.onend = () => setIsSpeaking(false);
+                          else setIsSpeaking(false);
+                        };
+                      } else setIsSpeaking(false);
+                    }
+                  }}
+                  className="flex items-center justify-center rounded-full w-8 h-8 transition-all active:scale-90"
+                  style={{ background: isSpeaking ? "rgba(37,165,102,0.25)" : "rgba(255,255,255,0.07)" }}
+                >
+                  {isSpeaking
+                    ? <VolumeX size={14} style={{ color: "#25A566" }} />
+                    : <Volume2 size={14} className="text-foreground" />
+                  }
+                </button>
+                <button
                   onClick={(e) => { e.stopPropagation(); setShowSettings(true); }}
-                  className="flex items-center justify-center rounded-full w-8 h-8"
+                  className="flex items-center justify-center rounded-full w-8 h-8 transition-all active:scale-90"
                   style={{ background: "rgba(255,255,255,0.07)" }}
                 >
                   <Settings2 size={14} className="text-foreground" />
