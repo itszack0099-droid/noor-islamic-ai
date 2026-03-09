@@ -9,19 +9,20 @@ export interface Language {
   flag: string;
   rtl: boolean;
   quranEdition: string;
+  hadithPrefix: string; // e.g. "eng", "urd", "ara" — used as {prefix}-bukhari etc.
 }
 
 export const LANGUAGES: Language[] = [
-  { code: "en", label: "English", flag: "🇬🇧", rtl: false, quranEdition: "en.asad" },
-  { code: "ar", label: "العربية", flag: "🇸🇦", rtl: true, quranEdition: "ar.muyassar" },
-  { code: "fr", label: "Français", flag: "🇫🇷", rtl: false, quranEdition: "fr.hamidullah" },
-  { code: "tr", label: "Türkçe", flag: "🇹🇷", rtl: false, quranEdition: "tr.ates" },
-  { code: "id", label: "Indonesian", flag: "🇮🇩", rtl: false, quranEdition: "id.indonesian" },
-  { code: "bn", label: "বাংলা", flag: "🇧🇩", rtl: false, quranEdition: "bn.bengali" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪", rtl: false, quranEdition: "de.bubenheim" },
-  { code: "es", label: "Español", flag: "🇪🇸", rtl: false, quranEdition: "es.cortes" },
-  { code: "ru", label: "Русский", flag: "🇷🇺", rtl: false, quranEdition: "ru.kuliev" },
-  { code: "ur", label: "اردو", flag: "🇮🇳", rtl: true, quranEdition: "ur.jalandhry" },
+  { code: "en", label: "English", flag: "🇬🇧", rtl: false, quranEdition: "en.asad", hadithPrefix: "eng" },
+  { code: "ar", label: "العربية", flag: "🇸🇦", rtl: true, quranEdition: "ar.muyassar", hadithPrefix: "ara" },
+  { code: "fr", label: "Français", flag: "🇫🇷", rtl: false, quranEdition: "fr.hamidullah", hadithPrefix: "eng" },
+  { code: "tr", label: "Türkçe", flag: "🇹🇷", rtl: false, quranEdition: "tr.ates", hadithPrefix: "eng" },
+  { code: "id", label: "Indonesian", flag: "🇮🇩", rtl: false, quranEdition: "id.indonesian", hadithPrefix: "eng" },
+  { code: "bn", label: "বাংলা", flag: "🇧🇩", rtl: false, quranEdition: "bn.bengali", hadithPrefix: "eng" },
+  { code: "de", label: "Deutsch", flag: "🇩🇪", rtl: false, quranEdition: "de.bubenheim", hadithPrefix: "eng" },
+  { code: "es", label: "Español", flag: "🇪🇸", rtl: false, quranEdition: "es.cortes", hadithPrefix: "eng" },
+  { code: "ru", label: "Русский", flag: "🇷🇺", rtl: false, quranEdition: "ru.kuliev", hadithPrefix: "eng" },
+  { code: "ur", label: "اردو", flag: "🇮🇳", rtl: true, quranEdition: "ur.jalandhry", hadithPrefix: "urd" },
 ];
 
 const translations: Record<LangCode, Record<string, string>> = {
@@ -318,6 +319,7 @@ interface I18nContextType {
   isRtl: boolean;
   quranEdition: string;
   secondaryQuranEdition: string | null;
+  hadithPrefix: string;
   currentLanguage: Language;
 }
 
@@ -330,6 +332,7 @@ const I18nContext = createContext<I18nContextType>({
   isRtl: false,
   quranEdition: "en.asad",
   secondaryQuranEdition: null,
+  hadithPrefix: "eng",
   currentLanguage: LANGUAGES[0],
 });
 
@@ -404,6 +407,7 @@ export const I18nProvider = ({ children }: { children: ReactNode }) => {
       isRtl: currentLanguage.rtl,
       quranEdition: currentLanguage.quranEdition,
       secondaryQuranEdition: secondaryLanguage?.quranEdition || null,
+      hadithPrefix: currentLanguage.hadithPrefix,
       currentLanguage,
     }}>
       {children}
