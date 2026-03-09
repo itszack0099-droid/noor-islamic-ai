@@ -108,6 +108,7 @@ const HadithScreen = ({ onBack, onOpenLanguageSettings }: HadithScreenProps) => 
   const [fontSize, setFontSize] = useState(20);
   const [showArabic, setShowArabic] = useState(true);
   const [showTranslation, setShowTranslation] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const bookInfo = BOOKS.find(b => b.key === currentBook) || BOOKS[0];
 
