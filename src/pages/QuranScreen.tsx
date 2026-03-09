@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, Mic, Square, Play, Bookmark, Share2, RotateCcw, BookOpen, Eye, CheckCircle, BarChart3 } from "lucide-react";
+import { ChevronLeft, Mic, Square, Play, Bookmark, Share2, RotateCcw, BookOpen, Eye, CheckCircle, BarChart3, ScrollText } from "lucide-react";
+import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 

@@ -1,6 +1,7 @@
-import { ChevronLeft, Mic, Volume2, Bookmark, Share2, Search, Loader2 } from "lucide-react";
+import { ChevronLeft, Mic, Volume2, Bookmark, Share2, Search, Loader2, BookOpen } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 
 interface HadithScreenProps {
   onBack: () => void;
