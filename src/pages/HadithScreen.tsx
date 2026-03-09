@@ -2,6 +2,7 @@ import { ChevronLeft, Mic, Volume2, Bookmark, Share2, Search, Loader2, BookOpen 
 import { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import CrossReferenceSheet from "@/components/CrossReferenceSheet";
+import ShareCardSheet from "@/components/ShareCardSheet";
 
 interface HadithScreenProps {
   onBack: () => void;
@@ -51,6 +52,7 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [crossRefHadith, setCrossRefHadith] = useState<{ text: string; reference: string } | null>(null);
+  const [shareHadith, setShareHadith] = useState<{ arabic: string; translation: string; reference: string } | null>(null);
 
   const fetchBook = useCallback(async (bookKey: string, bookName: string, page: number) => {
     try {
@@ -210,11 +212,19 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
                      >
                        <BookOpen size={14} style={{ color: "#25A566" }} />
                      </button>
-                     {[Volume2, Bookmark, Share2].map((Icon, i) => (
-                       <button key={i} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
-                         <Icon size={14} className="text-foreground" />
-                       </button>
-                     ))}
+                     <button className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
+                       <Volume2 size={14} className="text-foreground" />
+                     </button>
+                     <button className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
+                       <Bookmark size={14} className="text-foreground" />
+                     </button>
+                     <button
+                       onClick={() => setShareHadith({ arabic: h.arabic, translation: h.english, reference: `${h.book} #${h.hadithNumber}` })}
+                       className="flex items-center justify-center rounded-full"
+                       style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}
+                     >
+                       <Share2 size={14} className="text-foreground" />
+                     </button>
                    </div>
                 </div>
               </div>
@@ -239,6 +249,15 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
         type="hadith_to_quran"
         text={crossRefHadith?.text || ""}
         reference={crossRefHadith?.reference || ""}
+      />
+
+      <ShareCardSheet
+        open={!!shareHadith}
+        onClose={() => setShareHadith(null)}
+        arabic={shareHadith?.arabic || ""}
+        translation={shareHadith?.translation || ""}
+        reference={shareHadith?.reference || ""}
+        type="Hadith"
       />
     </div>
   );
