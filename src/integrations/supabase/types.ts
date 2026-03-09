@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      bookmarks: {
+        Row: {
+          arabic: string
+          created_at: string
+          id: string
+          reference: string
+          translation: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          arabic?: string
+          created_at?: string
+          id?: string
+          reference?: string
+          translation?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          arabic?: string
+          created_at?: string
+          id?: string
+          reference?: string
+          translation?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       hifz_progress: {
         Row: {
           ayah_number: number
@@ -124,6 +154,33 @@ export type Database = {
           id?: string
           quran_ayahs_read?: number
           reading_minutes?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          language: string
+          secondary_language: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          language?: string
+          secondary_language?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          language?: string
+          secondary_language?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
