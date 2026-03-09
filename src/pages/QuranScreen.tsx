@@ -247,6 +247,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
         </div>
         <VerseIdentifier open={showIdentifier} onClose={() => setShowIdentifier(false)} mode="quran" onOpenInQuran={handleOpenInQuran} />
       </div>
+    );
   }
 
   // =================== HIFZ PROGRESS ===================
@@ -349,6 +350,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
             <button onClick={() => setShowIdentifier(true)} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
               <Search size={16} className="text-foreground" />
             </button>
+            <button onClick={() => setShowProgress(true)} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
               <BarChart3 size={16} className="text-foreground" />
             </button>
             <button
