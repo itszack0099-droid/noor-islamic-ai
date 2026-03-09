@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, Mic, Square, Play, Bookmark, Share2, RotateCcw, BookOpen, Eye, CheckCircle, BarChart3, ScrollText } from "lucide-react";
+import { ChevronLeft, Mic, Square, Play, Pause, Bookmark, Share2, RotateCcw, BookOpen, Eye, CheckCircle, BarChart3, ScrollText } from "lucide-react";
 import CrossReferenceSheet from "@/components/CrossReferenceSheet";
+import QuranAudioPlayer from "@/components/QuranAudioPlayer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -54,6 +55,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [showProgress, setShowProgress] = useState(false);
   const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [crossRefAyah, setCrossRefAyah] = useState<{ text: string; reference: string } | null>(null);
+  const [audioAyahIdx, setAudioAyahIdx] = useState<number | null>(null);
 
   // Fetch surahs
   useEffect(() => {
