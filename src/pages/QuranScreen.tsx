@@ -473,6 +473,16 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
             })}
       </div>
 
+      {selectedSurah && ayahs.length > 0 && (
+        <QuranAudioPlayer
+          ayahs={ayahs}
+          surahName={selectedSurah.englishName}
+          surahNumber={selectedSurah.number}
+          playingAyahIdx={audioAyahIdx}
+          onPlayAyah={setAudioAyahIdx}
+        />
+      )}
+
       <CrossReferenceSheet
         open={!!crossRefAyah}
         onClose={() => setCrossRefAyah(null)}
