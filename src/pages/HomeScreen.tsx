@@ -1,4 +1,4 @@
-import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, MapPin, Search, Loader2, BarChart3, Settings, Globe, Bookmark } from "lucide-react";
+import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, MapPin, Search, Loader2, BarChart3, Settings, Globe, Bookmark, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import NotificationCenter, { getUnreadCount } from "@/components/NotificationCenter";
 import { useI18n } from "@/lib/i18n";
@@ -130,19 +130,16 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
           <h1 className="text-foreground font-bold mt-1" style={{ fontSize: 28 }}>Ahmad! 👋</h1>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => onNavigate("progress")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(37,165,102,0.15)" }}>
+          <button onClick={() => onNavigate("profile")} className="flex items-center justify-center rounded-full transition-all active:scale-90" style={{ width: 40, height: 40, background: "rgba(37,165,102,0.15)" }}>
+            <User size={18} style={{ color: "#25A566" }} />
+          </button>
+          <button onClick={() => onNavigate("progress")} className="flex items-center justify-center rounded-full transition-all active:scale-90" style={{ width: 40, height: 40, background: "rgba(37,165,102,0.15)" }}>
             <BarChart3 size={18} style={{ color: "#25A566" }} />
           </button>
-          <button onClick={() => onNavigate("bookmarks")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(201,168,76,0.15)" }}>
+          <button onClick={() => onNavigate("bookmarks")} className="flex items-center justify-center rounded-full transition-all active:scale-90" style={{ width: 40, height: 40, background: "rgba(201,168,76,0.15)" }}>
             <Bookmark size={18} style={{ color: "#C9A84C" }} />
           </button>
-          <button onClick={() => onNavigate("lang-settings")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
-            <Globe size={18} className="text-foreground" />
-          </button>
-          <button onClick={() => onNavigate("notif-settings")} className="flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
-            <Settings size={18} className="text-foreground" />
-          </button>
-          <button onClick={() => { setShowNotifCenter(true); setUnreadCount(0); }} className="relative flex items-center justify-center rounded-full" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
+          <button onClick={() => { setShowNotifCenter(true); setUnreadCount(0); }} className="relative flex items-center justify-center rounded-full transition-all active:scale-90" style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)" }}>
             <Bell size={18} className="text-foreground" />
             {unreadCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center rounded-full font-bold" style={{ width: 18, height: 18, fontSize: 9, background: "hsl(var(--destructive))", color: "white" }}>

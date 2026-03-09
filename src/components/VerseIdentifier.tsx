@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { X, Mic, Search, Share2, BookOpen, RotateCcw, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { startBeep, stopBeep } from "@/lib/audioFeedback";
 
 interface IdentifiedVerse {
   type: "quran" | "hadith";
@@ -81,6 +82,7 @@ const VerseIdentifier = ({ open, onClose, mode = "both", onOpenInQuran }: VerseI
 
     recognition.onend = () => setListening(false);
     setListening(true);
+    startBeep();
     recognition.start();
   }, [activeMode]);
 
@@ -88,6 +90,7 @@ const VerseIdentifier = ({ open, onClose, mode = "both", onOpenInQuran }: VerseI
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch {}
     }
+    stopBeep();
     setListening(false);
   }, []);
 
