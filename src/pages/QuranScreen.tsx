@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, Mic, Square, Play, Pause, Bookmark, Share2, RotateCcw, BookOpen, Eye, CheckCircle, BarChart3, ScrollText } from "lucide-react";
 import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 import QuranAudioPlayer from "@/components/QuranAudioPlayer";
+import ShareCardSheet from "@/components/ShareCardSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -56,6 +57,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [crossRefAyah, setCrossRefAyah] = useState<{ text: string; reference: string } | null>(null);
   const [audioAyahIdx, setAudioAyahIdx] = useState<number | null>(null);
+  const [shareAyah, setShareAyah] = useState<{ arabic: string; translation: string; reference: string } | null>(null);
 
   // Fetch surahs
   useEffect(() => {
@@ -388,11 +390,16 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                           >
                             <ScrollText size={14} style={{ color: "#C9A84C" }} />
                           </button>
-                          {[Bookmark, Share2].map((Icon, i) => (
-                            <button key={i} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
-                              <Icon size={14} className="text-foreground" />
-                            </button>
-                          ))}
+                          <button onClick={() => {}} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
+                            <Bookmark size={14} className="text-foreground" />
+                          </button>
+                          <button
+                            onClick={() => setShareAyah({ arabic: ayah.text, translation: ayah.translation, reference: `${selectedSurah.englishName} ${selectedSurah.number}:${ayah.numberInSurah}` })}
+                            className="flex items-center justify-center rounded-full"
+                            style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}
+                          >
+                            <Share2 size={14} className="text-foreground" />
+                          </button>
                         </>
                       )}
                     </div>
@@ -491,6 +498,15 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
         type="quran_to_hadith"
         text={crossRefAyah?.text || ""}
         reference={crossRefAyah?.reference || ""}
+      />
+
+      <ShareCardSheet
+        open={!!shareAyah}
+        onClose={() => setShareAyah(null)}
+        arabic={shareAyah?.arabic || ""}
+        translation={shareAyah?.translation || ""}
+        reference={shareAyah?.reference || ""}
+        type="Quran"
       />
     </div>
   );
