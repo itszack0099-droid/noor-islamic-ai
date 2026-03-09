@@ -292,6 +292,8 @@ const AIChatScreen = () => {
           </button>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };
