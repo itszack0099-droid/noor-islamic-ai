@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, Mic, Square, Play, Pause, Bookmark, BookmarkCheck, Share2, RotateCcw, Eye, CheckCircle, BarChart3, ScrollText, Brain, Star, AlertTriangle } from "lucide-react";
+import { ChevronLeft, Mic, Square, Play, Pause, Bookmark, BookmarkCheck, Share2, RotateCcw, Eye, CheckCircle, BarChart3, ScrollText, Brain, Star, AlertTriangle, Search } from "lucide-react";
+import VerseIdentifier from "@/components/VerseIdentifier";
 import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 import QuranAudioPlayer from "@/components/QuranAudioPlayer";
 import ShareCardSheet from "@/components/ShareCardSheet";
@@ -70,6 +71,15 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [audioAyahIdx, setAudioAyahIdx] = useState<number | null>(null);
   const [shareAyah, setShareAyah] = useState<{ arabic: string; translation: string; reference: string } | null>(null);
   const [bookmarkedRefs, setBookmarkedRefs] = useState<Set<string>>(new Set());
+  const [showIdentifier, setShowIdentifier] = useState(false);
+
+  const handleOpenInQuran = (surahNum: number, _ayahNum: number) => {
+    const surah = surahs.find(s => s.number === surahNum);
+    if (surah) {
+      setSelectedSurah(surah);
+      setShowIdentifier(false);
+    }
+  };
 
   // Fetch surahs
   useEffect(() => {
@@ -210,7 +220,9 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
               <ChevronLeft size={20} className="text-foreground" />
             </button>
             <h2 className="text-foreground font-bold" style={{ fontSize: 20 }}>{t("quran")}</h2>
-            <div style={{ width: 36 }} />
+            <button onClick={() => setShowIdentifier(true)} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
+              <Search size={18} className="text-foreground" />
+            </button>
           </div>
         </div>
         <div className="px-4 py-3">
@@ -233,6 +245,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                 </button>
               ))}
         </div>
+        <VerseIdentifier open={showIdentifier} onClose={() => setShowIdentifier(false)} mode="quran" onOpenInQuran={handleOpenInQuran} />
       </div>
     );
   }
@@ -334,6 +347,9 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
           </button>
           <h2 className="text-foreground font-bold" style={{ fontSize: 20 }}>{selectedSurah.englishName}</h2>
           <div className="flex items-center gap-2">
+            <button onClick={() => setShowIdentifier(true)} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
+              <Search size={16} className="text-foreground" />
+            </button>
             <button onClick={() => setShowProgress(true)} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
               <BarChart3 size={16} className="text-foreground" />
             </button>
@@ -647,6 +663,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
 
       <CrossReferenceSheet open={!!crossRefAyah} onClose={() => setCrossRefAyah(null)} type="quran_to_hadith" text={crossRefAyah?.text || ""} reference={crossRefAyah?.reference || ""} />
       <ShareCardSheet open={!!shareAyah} onClose={() => setShareAyah(null)} arabic={shareAyah?.arabic || ""} translation={shareAyah?.translation || ""} reference={shareAyah?.reference || ""} type="Quran" />
+      <VerseIdentifier open={showIdentifier} onClose={() => setShowIdentifier(false)} mode="quran" onOpenInQuran={handleOpenInQuran} />
     </div>
   );
 };

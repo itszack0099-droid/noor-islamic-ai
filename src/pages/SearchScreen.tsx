@@ -2,6 +2,7 @@ import { Search, Mic, MicOff, Loader2, ShieldCheck } from "lucide-react";
 import { useState, useRef, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import VerifyHadith from "@/components/VerifyHadith";
+import VerseIdentifier from "@/components/VerseIdentifier";
 
 interface SearchResult {
   type: "Quran" | "Hadith";
@@ -35,6 +36,7 @@ const SearchScreen = () => {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [listening, setListening] = useState(false);
+  const [showIdentifier, setShowIdentifier] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const doSearch = useCallback(async (q: string) => {
@@ -227,14 +229,35 @@ const SearchScreen = () => {
                 </div>
               </>
             ) : !searched ? (
-              <div className="flex flex-col items-center justify-center py-16 gap-2">
+              <div className="flex flex-col items-center justify-center py-12 gap-4">
                 <Search size={36} style={{ color: "rgba(255,255,255,0.15)" }} />
                 <p style={{ fontSize: 14, color: "rgba(255,255,255,0.3)" }}>Search the Quran & Hadith</p>
+
+                {/* Identify Verse Button */}
+                <button
+                  onClick={() => setShowIdentifier(true)}
+                  className="mt-2 flex items-center gap-3 px-6 py-4 rounded-2xl font-semibold transition-all active:scale-95"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(37,165,102,0.12), rgba(201,168,76,0.12))",
+                    border: "1px solid rgba(37,165,102,0.2)",
+                    width: "100%",
+                  }}
+                >
+                  <div className="flex items-center justify-center rounded-full" style={{ width: 44, height: 44, background: "linear-gradient(135deg, hsl(153 62% 40%), hsl(153 64% 29%))", boxShadow: "0 0 20px hsl(153 62% 40% / 0.3)" }}>
+                    <Mic size={22} style={{ color: "#fff" }} />
+                  </div>
+                  <div className="text-left">
+                    <p style={{ fontSize: 14, color: "hsl(153 62% 55%)" }}>🎙️ Identify Verse</p>
+                    <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>Recite to find any Quran verse or Hadith</p>
+                  </div>
+                </button>
               </div>
             ) : null}
           </div>
         </>
       )}
+
+      <VerseIdentifier open={showIdentifier} onClose={() => setShowIdentifier(false)} mode="both" />
     </div>
   );
 };
