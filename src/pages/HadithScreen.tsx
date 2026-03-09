@@ -1,5 +1,5 @@
-import { ChevronLeft, Mic, Volume2, Bookmark, BookmarkCheck, Share2, Search, Loader2, BookOpen } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { ChevronLeft, Volume2, Bookmark, BookmarkCheck, Share2, Loader2, BookOpen, Globe } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 import ShareCardSheet from "@/components/ShareCardSheet";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 interface HadithScreenProps {
   onBack: () => void;
+  onOpenLanguageSettings?: () => void;
 }
 
 interface HadithItem {
@@ -17,18 +18,15 @@ interface HadithItem {
   bookKey: string;
   hadithNumber: number;
   arabic: string;
-  english: string;
+  translation: string;
   grading: { label: string; color: string; bg: string };
 }
 
-const BOOKS = [
-  { key: "bukhari", label: "Bukhari", engEdition: "eng-bukhari", araEdition: "ara-bukhari" },
-  { key: "muslim", label: "Muslim", engEdition: "eng-muslim", araEdition: "ara-muslim" },
-  { key: "abudawud", label: "Abu Dawood", engEdition: "eng-abudawud", araEdition: "ara-abudawud" },
-  { key: "tirmidhi", label: "Tirmizi", engEdition: "eng-tirmidhi", araEdition: "ara-tirmidhi" },
-  { key: "nasai", label: "Nasai", engEdition: "eng-nasai", araEdition: "ara-nasai" },
-  { key: "ibnmajah", label: "Ibn Majah", engEdition: "eng-ibnmajah", araEdition: "ara-ibnmajah" },
-];
+const BOOK_KEYS = ["bukhari", "muslim", "abudawud", "tirmidhi", "nasai", "ibnmajah"] as const;
+const BOOK_LABELS: Record<string, string> = {
+  bukhari: "Bukhari", muslim: "Muslim", abudawud: "Abu Dawood",
+  tirmidhi: "Tirmizi", nasai: "Nasai", ibnmajah: "Ibn Majah",
+};
 
 const CDN = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions";
 
@@ -39,21 +37,47 @@ function getGrading(bookKey: string): HadithItem["grading"] {
   return { label: "Hasan", color: "#C9A84C", bg: "rgba(201,168,76,0.15)" };
 }
 
-interface BookCache {
-  eng: any[] | null;
-  ara: any[] | null;
+// Cache keyed by "{prefix}-{bookKey}" → hadiths[]
+const globalCache: Record<string, any[]> = {};
+
+async function fetchEdition(prefix: string, bookKey: string): Promise<any[]> {
+  const editionKey = `${prefix}-${bookKey}`;
+  if (globalCache[editionKey]) return globalCache[editionKey];
+
+  // Check localStorage
+  const lsKey = `hadith_cdn_${editionKey}`;
+  const ls = localStorage.getItem(lsKey);
+  if (ls) {
+    const parsed = JSON.parse(ls);
+    globalCache[editionKey] = parsed;
+    return parsed;
+  }
+
+  try {
+    const res = await fetch(`${CDN}/${editionKey}.json`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const hadiths = data.hadiths || [];
+    globalCache[editionKey] = hadiths;
+    try { localStorage.setItem(lsKey, JSON.stringify(hadiths.slice(0, 200))); } catch {}
+    return hadiths;
+  } catch {
+    return [];
+  }
 }
 
-const HadithScreen = ({ onBack }: HadithScreenProps) => {
-  const { t, isRtl } = useI18n();
+const HadithScreen = ({ onBack, onOpenLanguageSettings }: HadithScreenProps) => {
+  const { t, isRtl, lang, hadithPrefix, currentLanguage } = useI18n();
   const [activeBook, setActiveBook] = useState("bukhari");
-  const [cache, setCache] = useState<Record<string, BookCache>>({});
+  const [transData, setTransData] = useState<Record<string, any[]>>({});
+  const [araData, setAraData] = useState<Record<string, any[]>>({});
   const [displayCount, setDisplayCount] = useState(20);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [crossRefHadith, setCrossRefHadith] = useState<{ text: string; reference: string } | null>(null);
   const [shareHadith, setShareHadith] = useState<{ arabic: string; translation: string; reference: string } | null>(null);
   const [bookmarkedRefs, setBookmarkedRefs] = useState<Set<string>>(new Set());
+  const lastPrefix = useRef(hadithPrefix);
 
   // Load bookmarks
   useEffect(() => {
@@ -61,9 +85,7 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await (supabase.from("bookmarks") as any)
-        .select("reference")
-        .eq("user_id", user.id)
-        .eq("type", "hadith");
+        .select("reference").eq("user_id", user.id).eq("type", "hadith");
       if (data) setBookmarkedRefs(new Set(data.map((b: any) => b.reference)));
     })();
   }, []);
@@ -75,126 +97,77 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
       setBookmarkedRefs(prev => { const n = new Set(prev); n.delete(ref); return n; });
       toast.success(t("removeBookmark"));
     } else {
-      await addBookmark("hadith", h.arabic, h.english, ref);
+      await addBookmark("hadith", h.arabic, h.translation, ref);
       setBookmarkedRefs(prev => new Set(prev).add(ref));
       toast.success(t("bookmark") + " ✓");
     }
   };
 
-  const fetchBook = useCallback(async (bookKey: string) => {
-    // Check if already cached
-    if (cache[bookKey]?.eng) return;
-
-    const book = BOOKS.find(b => b.key === bookKey);
-    if (!book) return;
-
-    // Check localStorage
-    const lsEngKey = `hadith_cdn_${book.engEdition}`;
-    const lsAraKey = `hadith_cdn_${book.araEdition}`;
-    const lsEng = localStorage.getItem(lsEngKey);
-    const lsAra = localStorage.getItem(lsAraKey);
-
-    if (lsEng && lsAra) {
-      setCache(prev => ({
-        ...prev,
-        [bookKey]: { eng: JSON.parse(lsEng), ara: JSON.parse(lsAra) },
-      }));
-      return;
-    }
-
-    // Fetch both editions in parallel
-    try {
-      const [engRes, araRes] = await Promise.all([
-        fetch(`${CDN}/${book.engEdition}.json`),
-        fetch(`${CDN}/${book.araEdition}.json`),
-      ]);
-      const engData = await engRes.json();
-      const araData = await araRes.json();
-
-      const engHadiths = engData.hadiths || [];
-      const araHadiths = araData.hadiths || [];
-
-      // Store in localStorage (limit to first 200 to avoid storage limits)
-      try {
-        localStorage.setItem(lsEngKey, JSON.stringify(engHadiths.slice(0, 200)));
-        localStorage.setItem(lsAraKey, JSON.stringify(araHadiths.slice(0, 200)));
-      } catch { /* storage full, that's ok */ }
-
-      setCache(prev => ({
-        ...prev,
-        [bookKey]: { eng: engHadiths, ara: araHadiths },
-      }));
-    } catch (err) {
-      console.error(`Failed to fetch ${bookKey}:`, err);
-    }
-  }, [cache]);
-
-  // Fetch default book on mount
-  useEffect(() => {
-    setLoading(true);
-    fetchBook("bukhari").finally(() => setLoading(false));
+  const fetchBook = useCallback(async (bookKey: string, prefix: string) => {
+    const [trans, ara] = await Promise.all([
+      fetchEdition(prefix, bookKey),
+      fetchEdition("ara", bookKey),
+    ]);
+    setTransData(prev => ({ ...prev, [bookKey]: trans }));
+    setAraData(prev => ({ ...prev, [bookKey]: ara }));
   }, []);
 
-  // When switching books
-  const switchBook = async (bookKey: string) => {
+  // Fetch on mount & when language changes
+  useEffect(() => {
+    const langChanged = lastPrefix.current !== hadithPrefix;
+    lastPrefix.current = hadithPrefix;
+
+    if (langChanged) {
+      // Clear translation cache for re-fetch
+      setTransData({});
+      setAraData({});
+    }
+
+    setLoading(true);
+    if (activeBook === "all") {
+      Promise.all(BOOK_KEYS.map(k => fetchBook(k, hadithPrefix))).finally(() => setLoading(false));
+    } else {
+      fetchBook(activeBook, hadithPrefix).finally(() => setLoading(false));
+    }
+  }, [hadithPrefix, activeBook, fetchBook]);
+
+  const switchBook = (bookKey: string) => {
     setActiveBook(bookKey);
     setDisplayCount(20);
-    if (!cache[bookKey]?.eng) {
-      setLoading(true);
-      await fetchBook(bookKey);
-      setLoading(false);
-    }
   };
 
-  // Build display items
   const buildItems = (): HadithItem[] => {
-    if (activeBook === "all") {
-      // Merge first few from each cached book
-      const all: HadithItem[] = [];
-      for (const book of BOOKS) {
-        const bc = cache[book.key];
-        if (!bc?.eng) continue;
-        const slice = bc.eng.slice(0, 10);
-        slice.forEach((h: any, i: number) => {
-          const ara = bc.ara?.[i];
-          all.push({
-            book: book.label.toUpperCase(),
-            bookKey: book.key,
-            hadithNumber: h.hadithnumber || i + 1,
-            arabic: ara?.text || "",
-            english: h.text || "",
-            grading: getGrading(book.key),
-          });
+    const books = activeBook === "all" ? [...BOOK_KEYS] : [activeBook];
+    const all: HadithItem[] = [];
+
+    for (const bk of books) {
+      const trans = transData[bk] || [];
+      const ara = araData[bk] || [];
+      const limit = activeBook === "all" ? 10 : displayCount;
+      const slice = trans.slice(0, limit);
+
+      slice.forEach((h: any, i: number) => {
+        all.push({
+          book: (BOOK_LABELS[bk] || bk).toUpperCase(),
+          bookKey: bk,
+          hadithNumber: h.hadithnumber || i + 1,
+          arabic: ara[i]?.text || "",
+          translation: h.text || "",
+          grading: getGrading(bk),
         });
-      }
-      return all.slice(0, displayCount);
+      });
     }
 
-    const bc = cache[activeBook];
-    if (!bc?.eng) return [];
-
-    return bc.eng.slice(0, displayCount).map((h: any, i: number) => {
-      const ara = bc.ara?.[i];
-      const bookInfo = BOOKS.find(b => b.key === activeBook)!;
-      return {
-        book: bookInfo.label.toUpperCase(),
-        bookKey: activeBook,
-        hadithNumber: h.hadithnumber || i + 1,
-        arabic: ara?.text || "",
-        english: h.text || "",
-        grading: getGrading(activeBook),
-      };
-    });
+    return activeBook === "all" ? all.slice(0, displayCount) : all;
   };
 
   const displayHadiths = buildItems();
 
   const handleLoadMore = async () => {
     setLoadingMore(true);
-    // If "all" mode, we may need to fetch more books
     if (activeBook === "all") {
-      const unfetched = BOOKS.filter(b => !cache[b.key]?.eng);
-      await Promise.all(unfetched.map(b => fetchBook(b.key)));
+      const unfetched = BOOK_KEYS.filter(k => !transData[k]?.length);
+      await Promise.all(unfetched.map(k => fetchBook(k, hadithPrefix)));
     }
     setDisplayCount(prev => prev + 20);
     setLoadingMore(false);
@@ -203,18 +176,19 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
   const handleAllBooks = async () => {
     setActiveBook("all");
     setDisplayCount(20);
-    // Fetch all books that aren't cached yet
-    const unfetched = BOOKS.filter(b => !cache[b.key]?.eng);
+    const unfetched = BOOK_KEYS.filter(k => !transData[k]?.length);
     if (unfetched.length > 0) {
       setLoading(true);
-      await Promise.all(unfetched.map(b => fetchBook(b.key)));
+      await Promise.all(unfetched.map(k => fetchBook(k, hadithPrefix)));
       setLoading(false);
     }
   };
 
+  const langBadge = hadithPrefix === "urd" ? "UR" : hadithPrefix === "ara" ? "AR" : "EN";
+
   const bookChips = [
     { key: "all", label: t("allBooks") },
-    ...BOOKS.map(b => ({ key: b.key, label: b.label })),
+    ...BOOK_KEYS.map(k => ({ key: k, label: BOOK_LABELS[k] })),
   ];
 
   return (
@@ -225,7 +199,14 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
             <ChevronLeft size={20} className="text-foreground" />
           </button>
           <h2 className="text-foreground font-bold" style={{ fontSize: 20 }}>{t("hadithLibrary")}</h2>
-          <div style={{ width: 36 }} />
+          <button
+            onClick={onOpenLanguageSettings}
+            className="flex items-center gap-1 rounded-full px-2.5 py-1.5"
+            style={{ background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.3)" }}
+          >
+            <Globe size={13} style={{ color: "#C9A84C" }} />
+            <span className="font-bold" style={{ fontSize: 11, color: "#C9A84C" }}>{langBadge}</span>
+          </button>
         </div>
       </div>
 
@@ -282,12 +263,21 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
                       {h.arabic}
                     </p>
                   )}
-                  <p className="px-4 mt-3" style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.65 }}>
-                    {h.english}
-                  </p>
+                  {/* Translation — only show if different from arabic (i.e. not arabic-only mode) */}
+                  {h.translation && hadithPrefix !== "ara" && (
+                    <p className="px-4 mt-3" dir={currentLanguage.rtl ? "rtl" : "ltr"} style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.65 }}>
+                      {h.translation}
+                    </p>
+                  )}
+                  {/* If language IS Arabic, the translation IS the arabic text — show only once above */}
+                  {hadithPrefix === "ara" && h.translation && !h.arabic && (
+                    <p className="font-arabic text-right px-4 mt-3" dir="rtl" style={{ fontSize: 20, color: "#F0D080", lineHeight: 1.9 }}>
+                      {h.translation}
+                    </p>
+                  )}
                   <div className="flex items-center justify-end gap-2 px-4 py-3 mt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
                     <button
-                      onClick={() => setCrossRefHadith({ text: h.english || h.arabic, reference: ref })}
+                      onClick={() => setCrossRefHadith({ text: h.translation || h.arabic, reference: ref })}
                       className="flex items-center justify-center rounded-full"
                       style={{ width: 28, height: 28, background: "rgba(37,165,102,0.12)" }}
                     >
@@ -304,7 +294,7 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
                       {isSaved ? <BookmarkCheck size={14} style={{ color: "#C9A84C" }} /> : <Bookmark size={14} className="text-foreground" />}
                     </button>
                     <button
-                      onClick={() => setShareHadith({ arabic: h.arabic, translation: h.english, reference: ref })}
+                      onClick={() => setShareHadith({ arabic: h.arabic, translation: h.translation, reference: ref })}
                       className="flex items-center justify-center rounded-full"
                       style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}
                     >
@@ -315,7 +305,6 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
               );
             })}
 
-        {/* Load More */}
         {!loading && displayHadiths.length > 0 && (
           <button
             onClick={handleLoadMore}
