@@ -17,43 +17,38 @@ interface HadithItem {
   bookKey: string;
   hadithNumber: number;
   arabic: string;
-  narrator: string;
   english: string;
   grading: { label: string; color: string; bg: string };
-  topics: string[];
 }
 
-const BOOK_MAP: Record<string, { label: string; apiKey: string }> = {
-  "All Books": { label: "All Books", apiKey: "" },
-  Bukhari: { label: "Bukhari", apiKey: "bukhari" },
-  Muslim: { label: "Muslim", apiKey: "muslim" },
-  "Abu Dawood": { label: "Abu Dawood", apiKey: "abudawud" },
-  Tirmizi: { label: "Tirmizi", apiKey: "tirmizi" },
-  "Nasa'i": { label: "Nasa'i", apiKey: "nasai" },
-  "Ibn Majah": { label: "Ibn Majah", apiKey: "ibnmajah" },
-};
+const BOOKS = [
+  { key: "bukhari", label: "Bukhari", engEdition: "eng-bukhari", araEdition: "ara-bukhari" },
+  { key: "muslim", label: "Muslim", engEdition: "eng-muslim", araEdition: "ara-muslim" },
+  { key: "abudawud", label: "Abu Dawood", engEdition: "eng-abudawud", araEdition: "ara-abudawud" },
+  { key: "tirmidhi", label: "Tirmizi", engEdition: "eng-tirmidhi", araEdition: "ara-tirmidhi" },
+  { key: "nasai", label: "Nasai", engEdition: "eng-nasai", araEdition: "ara-nasai" },
+  { key: "ibnmajah", label: "Ibn Majah", engEdition: "eng-ibnmajah", araEdition: "ara-ibnmajah" },
+];
 
-const bookKeys = Object.keys(BOOK_MAP);
-const BASE = "https://hadith-api.vercel.app";
+const CDN = "https://cdn.jsdelivr.net/gh/fawazahmed0/hadith-api@1/editions";
 
-function parseHadith(raw: any, bookName: string, bookKey: string): HadithItem {
-  return {
-    book: bookName.toUpperCase(),
-    bookKey,
-    hadithNumber: raw.hadithNumber || raw.id || 0,
-    arabic: raw.hadithArabic || raw.arabic || "",
-    narrator: raw.narrator || raw.chain || "",
-    english: raw.hadithEnglish || raw.english || raw.text || "",
-    grading: { label: "Sahih", color: "#25A566", bg: "rgba(37,165,102,0.15)" },
-    topics: [],
-  };
+function getGrading(bookKey: string): HadithItem["grading"] {
+  if (bookKey === "bukhari" || bookKey === "muslim") {
+    return { label: "Sahih", color: "#25A566", bg: "rgba(37,165,102,0.15)" };
+  }
+  return { label: "Hasan", color: "#C9A84C", bg: "rgba(201,168,76,0.15)" };
+}
+
+interface BookCache {
+  eng: any[] | null;
+  ara: any[] | null;
 }
 
 const HadithScreen = ({ onBack }: HadithScreenProps) => {
   const { t, isRtl } = useI18n();
-  const [activeBook, setActiveBook] = useState("All Books");
-  const [allHadiths, setAllHadiths] = useState<Record<string, HadithItem[]>>({});
-  const [pages, setPages] = useState<Record<string, number>>({});
+  const [activeBook, setActiveBook] = useState("bukhari");
+  const [cache, setCache] = useState<Record<string, BookCache>>({});
+  const [displayCount, setDisplayCount] = useState(20);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [crossRefHadith, setCrossRefHadith] = useState<{ text: string; reference: string } | null>(null);
@@ -86,74 +81,141 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
     }
   };
 
-  const fetchBook = useCallback(async (bookKey: string, bookName: string, page: number) => {
-    try {
-      const cacheKey = `hadith_${bookKey}_${page}`;
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) return JSON.parse(cached) as HadithItem[];
+  const fetchBook = useCallback(async (bookKey: string) => {
+    // Check if already cached
+    if (cache[bookKey]?.eng) return;
 
-      const res = await fetch(`${BASE}/api/hadiths/${bookKey}?page=${page}&limit=20`);
-      const data = await res.json();
-      const items = (data.hadiths || data.data || data || []).map((h: any) => parseHadith(h, bookName, bookKey));
-      localStorage.setItem(cacheKey, JSON.stringify(items));
-      return items;
-    } catch {
-      return [];
+    const book = BOOKS.find(b => b.key === bookKey);
+    if (!book) return;
+
+    // Check localStorage
+    const lsEngKey = `hadith_cdn_${book.engEdition}`;
+    const lsAraKey = `hadith_cdn_${book.araEdition}`;
+    const lsEng = localStorage.getItem(lsEngKey);
+    const lsAra = localStorage.getItem(lsAraKey);
+
+    if (lsEng && lsAra) {
+      setCache(prev => ({
+        ...prev,
+        [bookKey]: { eng: JSON.parse(lsEng), ara: JSON.parse(lsAra) },
+      }));
+      return;
     }
+
+    // Fetch both editions in parallel
+    try {
+      const [engRes, araRes] = await Promise.all([
+        fetch(`${CDN}/${book.engEdition}.json`),
+        fetch(`${CDN}/${book.araEdition}.json`),
+      ]);
+      const engData = await engRes.json();
+      const araData = await araRes.json();
+
+      const engHadiths = engData.hadiths || [];
+      const araHadiths = araData.hadiths || [];
+
+      // Store in localStorage (limit to first 200 to avoid storage limits)
+      try {
+        localStorage.setItem(lsEngKey, JSON.stringify(engHadiths.slice(0, 200)));
+        localStorage.setItem(lsAraKey, JSON.stringify(araHadiths.slice(0, 200)));
+      } catch { /* storage full, that's ok */ }
+
+      setCache(prev => ({
+        ...prev,
+        [bookKey]: { eng: engHadiths, ara: araHadiths },
+      }));
+    } catch (err) {
+      console.error(`Failed to fetch ${bookKey}:`, err);
+    }
+  }, [cache]);
+
+  // Fetch default book on mount
+  useEffect(() => {
+    setLoading(true);
+    fetchBook("bukhari").finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    const entries = Object.entries(BOOK_MAP).filter(([k]) => k !== "All Books");
-    Promise.all(entries.map(([name, { apiKey }]) => fetchBook(apiKey, name, 1)))
-      .then((results) => {
-        if (cancelled) return;
-        const map: Record<string, HadithItem[]> = {};
-        const pg: Record<string, number> = {};
-        entries.forEach(([name, { apiKey }], i) => {
-          map[apiKey] = results[i];
-          pg[apiKey] = 1;
-        });
-        setAllHadiths(map);
-        setPages(pg);
-      })
-      .finally(() => !cancelled && setLoading(false));
-    return () => { cancelled = true; };
-  }, [fetchBook]);
+  // When switching books
+  const switchBook = async (bookKey: string) => {
+    setActiveBook(bookKey);
+    setDisplayCount(20);
+    if (!cache[bookKey]?.eng) {
+      setLoading(true);
+      await fetchBook(bookKey);
+      setLoading(false);
+    }
+  };
 
-  const displayHadiths = activeBook === "All Books"
-    ? Object.values(allHadiths).flat()
-    : allHadiths[BOOK_MAP[activeBook]?.apiKey] || [];
+  // Build display items
+  const buildItems = (): HadithItem[] => {
+    if (activeBook === "all") {
+      // Merge first few from each cached book
+      const all: HadithItem[] = [];
+      for (const book of BOOKS) {
+        const bc = cache[book.key];
+        if (!bc?.eng) continue;
+        const slice = bc.eng.slice(0, 10);
+        slice.forEach((h: any, i: number) => {
+          const ara = bc.ara?.[i];
+          all.push({
+            book: book.label.toUpperCase(),
+            bookKey: book.key,
+            hadithNumber: h.hadithnumber || i + 1,
+            arabic: ara?.text || "",
+            english: h.text || "",
+            grading: getGrading(book.key),
+          });
+        });
+      }
+      return all.slice(0, displayCount);
+    }
+
+    const bc = cache[activeBook];
+    if (!bc?.eng) return [];
+
+    return bc.eng.slice(0, displayCount).map((h: any, i: number) => {
+      const ara = bc.ara?.[i];
+      const bookInfo = BOOKS.find(b => b.key === activeBook)!;
+      return {
+        book: bookInfo.label.toUpperCase(),
+        bookKey: activeBook,
+        hadithNumber: h.hadithnumber || i + 1,
+        arabic: ara?.text || "",
+        english: h.text || "",
+        grading: getGrading(activeBook),
+      };
+    });
+  };
+
+  const displayHadiths = buildItems();
 
   const handleLoadMore = async () => {
     setLoadingMore(true);
-    if (activeBook === "All Books") {
-      const entries = Object.entries(BOOK_MAP).filter(([k]) => k !== "All Books");
-      const results = await Promise.all(
-        entries.map(([name, { apiKey }]) => fetchBook(apiKey, name, (pages[apiKey] || 1) + 1))
-      );
-      setAllHadiths((prev) => {
-        const next = { ...prev };
-        entries.forEach(([, { apiKey }], i) => {
-          next[apiKey] = [...(next[apiKey] || []), ...results[i]];
-        });
-        return next;
-      });
-      setPages((prev) => {
-        const next = { ...prev };
-        entries.forEach(([, { apiKey }]) => { next[apiKey] = (next[apiKey] || 1) + 1; });
-        return next;
-      });
-    } else {
-      const apiKey = BOOK_MAP[activeBook].apiKey;
-      const nextPage = (pages[apiKey] || 1) + 1;
-      const items = await fetchBook(apiKey, activeBook, nextPage);
-      setAllHadiths((prev) => ({ ...prev, [apiKey]: [...(prev[apiKey] || []), ...items] }));
-      setPages((prev) => ({ ...prev, [apiKey]: nextPage }));
+    // If "all" mode, we may need to fetch more books
+    if (activeBook === "all") {
+      const unfetched = BOOKS.filter(b => !cache[b.key]?.eng);
+      await Promise.all(unfetched.map(b => fetchBook(b.key)));
     }
+    setDisplayCount(prev => prev + 20);
     setLoadingMore(false);
   };
+
+  const handleAllBooks = async () => {
+    setActiveBook("all");
+    setDisplayCount(20);
+    // Fetch all books that aren't cached yet
+    const unfetched = BOOKS.filter(b => !cache[b.key]?.eng);
+    if (unfetched.length > 0) {
+      setLoading(true);
+      await Promise.all(unfetched.map(b => fetchBook(b.key)));
+      setLoading(false);
+    }
+  };
+
+  const bookChips = [
+    { key: "all", label: t("allBooks") },
+    ...BOOKS.map(b => ({ key: b.key, label: b.label })),
+  ];
 
   return (
     <div className="min-h-screen" dir={isRtl ? "rtl" : "ltr"}>
@@ -163,109 +225,97 @@ const HadithScreen = ({ onBack }: HadithScreenProps) => {
             <ChevronLeft size={20} className="text-foreground" />
           </button>
           <h2 className="text-foreground font-bold" style={{ fontSize: 20 }}>{t("hadithLibrary")}</h2>
-          <button className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "#C9A84C" }}>
-            <Mic size={18} style={{ color: "#0A0F0D" }} />
-          </button>
-        </div>
-        <div className="px-5 pb-4">
-          <div className="flex items-center gap-2 px-4" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, height: 44 }}>
-            <Search size={16} style={{ color: "rgba(255,255,255,0.35)" }} />
-            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", flex: 1 }}>{t("searchPlaceholder")}</span>
-            <Mic size={16} style={{ color: "#C9A84C" }} />
-          </div>
+          <div style={{ width: 36 }} />
         </div>
       </div>
 
+      {/* Book Chips */}
       <div className="flex gap-2 px-5 py-3 overflow-x-auto scrollbar-none">
-        {bookKeys.map((book) => (
+        {bookChips.map((chip) => (
           <button
-            key={book}
-            onClick={() => setActiveBook(book)}
+            key={chip.key}
+            onClick={() => chip.key === "all" ? handleAllBooks() : switchBook(chip.key)}
             className="shrink-0 px-4 py-2 rounded-full font-semibold transition-all"
             style={{
               fontSize: 12,
-              background: activeBook === book ? "#C9A84C" : "rgba(255,255,255,0.07)",
-              color: activeBook === book ? "#fff" : "rgba(255,255,255,0.6)",
+              background: activeBook === chip.key ? "#C9A84C" : "rgba(255,255,255,0.07)",
+              color: activeBook === chip.key ? "#fff" : "rgba(255,255,255,0.6)",
             }}
           >
-            {book === "All Books" ? t("allBooks") : book}
+            {chip.label}
           </button>
         ))}
       </div>
 
+      {/* Hadith Cards */}
       <div className="px-4 pb-4">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="mb-3.5" style={{ background: "#111A14", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 16 }}>
                 <Skeleton className="h-3 w-20 mb-3" />
                 <Skeleton className="h-5 w-full mb-2" />
+                <Skeleton className="h-5 w-full mb-2" />
                 <Skeleton className="h-3 w-40 mb-2" />
                 <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4 mt-1" />
               </div>
             ))
-          : displayHadiths.map((h, idx) => {
+          : displayHadiths.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <p style={{ fontSize: 14, color: "rgba(255,255,255,0.4)" }}>{t("noResults")}</p>
+            </div>
+          ) : displayHadiths.map((h, idx) => {
               const ref = `${h.book} #${h.hadithNumber}`;
               const isSaved = bookmarkedRefs.has(ref);
               return (
-              <div key={`${h.bookKey}-${h.hadithNumber}-${idx}`} className="mb-3.5 active:scale-[0.98] transition-transform" style={{ background: "#111A14", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, overflow: "hidden" }}>
-                <div className="flex items-center justify-between px-4 pt-4">
-                  <span className="font-bold uppercase" style={{ fontSize: 11, color: "#C9A84C", letterSpacing: 1 }}>
-                    {h.book} #{h.hadithNumber}
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full font-semibold" style={{ fontSize: 10, background: h.grading.bg, color: h.grading.color }}>
-                    ✅ {h.grading.label}
-                  </span>
-                </div>
-                {h.arabic && (
-                  <p className="font-arabic text-right px-4 mt-2" dir="rtl" style={{ fontSize: 18, color: "#F0D080", lineHeight: 1.8 }}>
-                    {h.arabic}
-                  </p>
-                )}
-                {h.narrator && (
-                  <p className="px-4 mt-1 italic" style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
-                    {h.narrator}
-                  </p>
-                )}
-                <p className="px-4 mt-2" style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.65 }}>
-                  {h.english}
-                </p>
-                <div className="flex items-center justify-between px-4 py-3 mt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                  <div className="flex gap-1.5">
-                    {h.topics.map((t) => (
-                      <span key={t} className="px-2.5 py-1 rounded-full font-semibold" style={{ fontSize: 10, background: "rgba(201,168,76,0.12)", color: "#C9A84C" }}>{t}</span>
-                    ))}
+                <div key={`${h.bookKey}-${h.hadithNumber}-${idx}`} className="mb-3.5" style={{ background: "#111A14", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, overflow: "hidden" }}>
+                  <div className="flex items-center justify-between px-4 pt-4">
+                    <span className="font-bold uppercase" style={{ fontSize: 11, color: "#C9A84C", letterSpacing: 1 }}>
+                      {h.book} #{h.hadithNumber}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full font-semibold" style={{ fontSize: 10, background: h.grading.bg, color: h.grading.color }}>
+                      ✅ {h.grading.label}
+                    </span>
                   </div>
-                   <div className="flex gap-2">
-                     <button
-                       onClick={() => setCrossRefHadith({ text: h.english || h.arabic, reference: ref })}
-                       className="flex items-center justify-center rounded-full"
-                       style={{ width: 28, height: 28, background: "rgba(37,165,102,0.12)" }}
-                     >
-                       <BookOpen size={14} style={{ color: "#25A566" }} />
-                     </button>
-                     <button className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
-                       <Volume2 size={14} className="text-foreground" />
-                     </button>
-                     <button
-                       onClick={() => toggleBookmark(h)}
-                       className="flex items-center justify-center rounded-full"
-                       style={{ width: 28, height: 28, background: isSaved ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.07)" }}
-                     >
-                       {isSaved ? <BookmarkCheck size={14} style={{ color: "#C9A84C" }} /> : <Bookmark size={14} className="text-foreground" />}
-                     </button>
-                     <button
-                       onClick={() => setShareHadith({ arabic: h.arabic, translation: h.english, reference: ref })}
-                       className="flex items-center justify-center rounded-full"
-                       style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}
-                     >
-                       <Share2 size={14} className="text-foreground" />
-                     </button>
-                   </div>
+                  {h.arabic && (
+                    <p className="font-arabic text-right px-4 mt-3" dir="rtl" style={{ fontSize: 20, color: "#F0D080", lineHeight: 1.9 }}>
+                      {h.arabic}
+                    </p>
+                  )}
+                  <p className="px-4 mt-3" style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.65 }}>
+                    {h.english}
+                  </p>
+                  <div className="flex items-center justify-end gap-2 px-4 py-3 mt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                    <button
+                      onClick={() => setCrossRefHadith({ text: h.english || h.arabic, reference: ref })}
+                      className="flex items-center justify-center rounded-full"
+                      style={{ width: 28, height: 28, background: "rgba(37,165,102,0.12)" }}
+                    >
+                      <BookOpen size={14} style={{ color: "#25A566" }} />
+                    </button>
+                    <button className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}>
+                      <Volume2 size={14} className="text-foreground" />
+                    </button>
+                    <button
+                      onClick={() => toggleBookmark(h)}
+                      className="flex items-center justify-center rounded-full"
+                      style={{ width: 28, height: 28, background: isSaved ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.07)" }}
+                    >
+                      {isSaved ? <BookmarkCheck size={14} style={{ color: "#C9A84C" }} /> : <Bookmark size={14} className="text-foreground" />}
+                    </button>
+                    <button
+                      onClick={() => setShareHadith({ arabic: h.arabic, translation: h.english, reference: ref })}
+                      className="flex items-center justify-center rounded-full"
+                      style={{ width: 28, height: 28, background: "rgba(255,255,255,0.07)" }}
+                    >
+                      <Share2 size={14} className="text-foreground" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
+        {/* Load More */}
         {!loading && displayHadiths.length > 0 && (
           <button
             onClick={handleLoadMore}
