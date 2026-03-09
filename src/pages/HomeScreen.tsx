@@ -258,6 +258,8 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
         </div>
         <ChevronRight size={18} style={{ color: "rgba(255,255,255,0.2)" }} />
       </button>
+
+      <NotificationCenter open={showNotifCenter} onClose={() => setShowNotifCenter(false)} />
     </div>
   );
 };
