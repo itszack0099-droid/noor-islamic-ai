@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.cross-reference]
 verify_jwt = false
+
+[functions.identify-hadith]
+verify_jwt = false
