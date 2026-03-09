@@ -323,6 +323,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
             ))
           : ayahs.map((ayah, idx) => {
               const isActive = idx === activeAyahIdx && listening;
+              const isAudioPlaying = audioAyahIdx === idx;
               const hasResult = result && result.ayahIdx === idx;
               const isMemorized = hifzRecords[ayah.numberInSurah]?.memorized;
               const isPeeking = peekingAyah === ayah.numberInSurah;
@@ -338,6 +339,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                 <div key={ayah.number} className="px-5 py-4 transition-all" style={{
                   borderBottom: "1px solid rgba(255,255,255,0.05)",
                   ...(isActive ? { borderLeft: "3px solid #C9A84C", background: "rgba(201,168,76,0.06)" } : {}),
+                  ...(isAudioPlaying ? { borderLeft: "3px solid #25A566", background: "rgba(37,165,102,0.04)" } : {}),
                   ...(hasResult ? { borderLeft: "3px solid #25A566", background: "rgba(37,165,102,0.04)" } : {}),
                   ...(isMemorized && hifzMode ? { borderLeft: "3px solid #25A566" } : {}),
                 }}>
