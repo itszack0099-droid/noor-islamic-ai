@@ -1,6 +1,7 @@
 import { Send, Bot, Sparkles } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import DuaFinder from "@/components/DuaFinder";
 
 interface Message {
   role: "user" | "assistant";
@@ -72,6 +73,7 @@ const AIChatScreen = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"chat" | "dua">("chat");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -118,27 +120,61 @@ const AIChatScreen = () => {
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ background: "#0A0008" }}>
-      {/* Header */}
+    <div className="flex flex-col h-full" style={{ background: "hsl(var(--background))" }}>
+      {/* Header with tabs */}
       <div
-        className="flex items-center gap-3 px-5 py-3 shrink-0"
+        className="shrink-0"
         style={{
-          background: "rgba(109,40,217,0.12)",
+          background: "hsl(var(--violet) / 0.12)",
           backdropFilter: "blur(20px)",
-          borderBottom: "1px solid rgba(109,40,217,0.2)",
+          borderBottom: "1px solid hsl(var(--violet) / 0.2)",
         }}
       >
-        <div
-          className="flex items-center justify-center rounded-full"
-          style={{ width: 38, height: 38, background: "linear-gradient(135deg, #4C1D95, #6D28D9)" }}
-        >
-          <Bot size={20} color="#fff" />
+        <div className="flex items-center gap-3 px-5 py-3">
+          <div
+            className="flex items-center justify-center rounded-full"
+            style={{ width: 38, height: 38, background: "linear-gradient(135deg, hsl(var(--violet-dark)), hsl(var(--violet)))" }}
+          >
+            <Bot size={20} className="text-primary-foreground" />
+          </div>
+          <div>
+            <p className="font-bold text-[16px] text-foreground">NoorAI Scholar</p>
+            <p style={{ fontSize: 11, color: "hsl(153, 62%, 40%)" }}>● Online — Ready to help</p>
+          </div>
         </div>
-        <div>
-          <p className="font-bold text-[16px]" style={{ color: "#F0F4F0" }}>NoorAI Scholar</p>
-          <p style={{ fontSize: 11, color: "#10B981" }}>● Online — Ready to help</p>
+        {/* Tabs */}
+        <div className="flex gap-2 px-5 pb-3">
+          <button
+            onClick={() => setActiveTab("chat")}
+            className="flex-1 py-2 rounded-xl font-semibold transition-all"
+            style={{
+              fontSize: 13,
+              background: activeTab === "chat" ? "hsl(var(--violet) / 0.2)" : "hsl(var(--muted))",
+              color: activeTab === "chat" ? "hsl(var(--violet-text))" : "hsl(var(--muted-foreground))",
+              border: `1px solid ${activeTab === "chat" ? "hsl(var(--violet) / 0.3)" : "hsl(var(--border))"}`,
+            }}
+          >
+            🤖 AI Scholar
+          </button>
+          <button
+            onClick={() => setActiveTab("dua")}
+            className="flex-1 py-2 rounded-xl font-semibold transition-all"
+            style={{
+              fontSize: 13,
+              background: activeTab === "dua" ? "hsl(var(--accent) / 0.15)" : "hsl(var(--muted))",
+              color: activeTab === "dua" ? "hsl(var(--accent))" : "hsl(var(--muted-foreground))",
+              border: `1px solid ${activeTab === "dua" ? "hsl(var(--accent) / 0.3)" : "hsl(var(--border))"}`,
+            }}
+          >
+            🤲 Dua Finder
+          </button>
         </div>
       </div>
+
+      {activeTab === "dua" ? (
+        <DuaFinder />
+      ) : (
+        <>
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-none px-4 py-4 flex flex-col gap-3">
@@ -255,6 +291,8 @@ const AIChatScreen = () => {
           </button>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };
