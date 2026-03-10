@@ -75,6 +75,8 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [shareAyah, setShareAyah] = useState<{ arabic: string; translation: string; reference: string } | null>(null);
   const [bookmarkedRefs, setBookmarkedRefs] = useState<Set<string>>(new Set());
   const [showIdentifier, setShowIdentifier] = useState(false);
+  const [tarteelAyahIdx, setTarteelAyahIdx] = useState<number | null>(null);
+  const [showHifzAI, setShowHifzAI] = useState(false);
 
   const handleOpenInQuran = (surahNum: number, _ayahNum: number) => {
     const surah = surahs.find(s => s.number === surahNum);
