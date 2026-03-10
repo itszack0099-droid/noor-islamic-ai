@@ -1,8 +1,9 @@
-import { Search, Mic, MicOff, Loader2, ShieldCheck } from "lucide-react";
+import { Search, Mic, MicOff, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { useState, useRef, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import VerifyHadith from "@/components/VerifyHadith";
 import VerseIdentifier from "@/components/VerseIdentifier";
+import NoorDetect from "@/components/NoorDetect";
 
 interface SearchResult {
   type: "Quran" | "Hadith";
