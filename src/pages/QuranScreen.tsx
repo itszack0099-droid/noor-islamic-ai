@@ -4,6 +4,8 @@ import VerseIdentifier from "@/components/VerseIdentifier";
 import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 import QuranAudioPlayer from "@/components/QuranAudioPlayer";
 import ShareCardSheet from "@/components/ShareCardSheet";
+import TarteelMode from "@/components/TarteelMode";
+import HifzAI from "@/components/HifzAI";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
