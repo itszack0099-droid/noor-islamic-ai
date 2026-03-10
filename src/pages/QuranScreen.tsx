@@ -235,7 +235,19 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
               <Search size={18} className="text-foreground" />
             </button>
           </div>
-        </div>
+          </div>
+          {/* HifzAI button */}
+          <button
+            onClick={() => setShowHifzAI(true)}
+            className="mx-5 mb-2 flex items-center gap-3 px-4 py-3 rounded-2xl active:scale-95 transition-transform"
+            style={{ background: "linear-gradient(135deg, rgba(109,40,217,0.15), rgba(201,168,76,0.1))", border: "1px solid rgba(109,40,217,0.25)" }}
+          >
+            <Brain size={20} style={{ color: "#A78BFA" }} />
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "#A78BFA" }}>🧠 HifzAI</p>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>AI-powered memorization checker</p>
+            </div>
+          </button>
         <div className="px-4 py-3">
           {loadingSurahs
             ? Array.from({ length: 12 }).map((_, i) => (
