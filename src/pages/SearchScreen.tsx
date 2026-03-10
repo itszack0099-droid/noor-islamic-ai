@@ -1,8 +1,9 @@
-import { Search, Mic, MicOff, Loader2, ShieldCheck } from "lucide-react";
+import { Search, Mic, MicOff, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { useState, useRef, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import VerifyHadith from "@/components/VerifyHadith";
 import VerseIdentifier from "@/components/VerseIdentifier";
+import NoorDetect from "@/components/NoorDetect";
 
 interface SearchResult {
   type: "Quran" | "Hadith";
@@ -37,6 +38,7 @@ const SearchScreen = () => {
   const [searched, setSearched] = useState(false);
   const [listening, setListening] = useState(false);
   const [showIdentifier, setShowIdentifier] = useState(false);
+  const [showNoorDetect, setShowNoorDetect] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const doSearch = useCallback(async (q: string) => {
@@ -229,14 +231,33 @@ const SearchScreen = () => {
                 </div>
               </>
             ) : !searched ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <div className="flex flex-col items-center justify-center py-8 gap-4">
                 <Search size={36} style={{ color: "rgba(255,255,255,0.15)" }} />
                 <p style={{ fontSize: 14, color: "rgba(255,255,255,0.3)" }}>Search the Quran & Hadith</p>
+
+                {/* NoorDetect Button */}
+                <button
+                  onClick={() => setShowNoorDetect(true)}
+                  className="flex items-center gap-3 px-6 py-4 rounded-2xl font-semibold transition-all active:scale-95"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(109,40,217,0.2), rgba(26,122,74,0.2))",
+                    border: "1px solid rgba(201,168,76,0.3)",
+                    width: "100%",
+                  }}
+                >
+                  <div className="flex items-center justify-center rounded-full" style={{ width: 44, height: 44, background: "linear-gradient(135deg, #6D28D9, #1A7A4A)", boxShadow: "0 0 20px rgba(109,40,217,0.3)" }}>
+                    <Sparkles size={22} style={{ color: "#fff" }} />
+                  </div>
+                  <div className="text-left">
+                    <p style={{ fontSize: 16, color: "#C9A84C", fontWeight: 800 }}>✨ NoorDetect</p>
+                    <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>Recite any Ayah or Hadith — AI identifies instantly</p>
+                  </div>
+                </button>
 
                 {/* Identify Verse Button */}
                 <button
                   onClick={() => setShowIdentifier(true)}
-                  className="mt-2 flex items-center gap-3 px-6 py-4 rounded-2xl font-semibold transition-all active:scale-95"
+                  className="flex items-center gap-3 px-6 py-4 rounded-2xl font-semibold transition-all active:scale-95"
                   style={{
                     background: "linear-gradient(135deg, rgba(37,165,102,0.12), rgba(201,168,76,0.12))",
                     border: "1px solid rgba(37,165,102,0.2)",
@@ -258,6 +279,7 @@ const SearchScreen = () => {
       )}
 
       <VerseIdentifier open={showIdentifier} onClose={() => setShowIdentifier(false)} mode="both" />
+      <NoorDetect open={showNoorDetect} onClose={() => setShowNoorDetect(false)} />
     </div>
   );
 };
