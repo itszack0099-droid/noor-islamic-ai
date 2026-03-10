@@ -216,6 +216,11 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const needsReviewCount = Object.values(hifzRecords).filter(r => r.memorized && new Date(r.last_practiced_at).getTime() < sevenDaysAgo).length;
 
+  // =================== HIFZ AI MODE ===================
+  if (showHifzAI) {
+    return <HifzAI surahs={surahs} onBack={() => setShowHifzAI(false)} />;
+  }
+
   // =================== SURAH LIST ===================
   if (!selectedSurah) {
     return (
