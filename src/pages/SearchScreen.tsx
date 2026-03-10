@@ -279,6 +279,7 @@ const SearchScreen = () => {
       )}
 
       <VerseIdentifier open={showIdentifier} onClose={() => setShowIdentifier(false)} mode="both" />
+      <NoorDetect open={showNoorDetect} onClose={() => setShowNoorDetect(false)} />
     </div>
   );
 };
