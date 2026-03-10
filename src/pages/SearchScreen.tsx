@@ -38,6 +38,7 @@ const SearchScreen = () => {
   const [searched, setSearched] = useState(false);
   const [listening, setListening] = useState(false);
   const [showIdentifier, setShowIdentifier] = useState(false);
+  const [showNoorDetect, setShowNoorDetect] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const doSearch = useCallback(async (q: string) => {
