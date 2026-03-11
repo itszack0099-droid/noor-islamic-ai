@@ -34,7 +34,7 @@ const APP_LANGS = [
 const FONTS = ["Amiri", "Noto Naskh Arabic", "Scheherazade New"];
 
 const SettingsScreen = ({ onBack, onNavigate }: SettingsScreenProps) => {
-  const { currentLanguage, setLanguage } = useI18n();
+  const { currentLanguage, setLang } = useI18n();
 
   // Quran settings
   const [arabicSize, setArabicSize] = useState(() => Number(localStorage.getItem("quran_arabic_size") || "26"));
