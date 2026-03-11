@@ -143,7 +143,7 @@ const SettingsScreen = ({ onBack, onNavigate }: SettingsScreenProps) => {
         {/* APPEARANCE */}
         <Section icon={<Palette size={14} style={{ color: "#C9A84C" }} />} title="Appearance">
           <Row label="App Language" right={
-            <select value={currentLanguage} onChange={e => setLanguage(e.target.value)} className="bg-transparent text-right outline-none" style={{ fontSize: 13, color: "#C9A84C" }}>
+            <select value={currentLanguage.code} onChange={e => setLang(e.target.value as any)} className="bg-transparent text-right outline-none" style={{ fontSize: 13, color: "#C9A84C" }}>
               {APP_LANGS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
             </select>
           } />
