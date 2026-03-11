@@ -2,6 +2,7 @@ import { Bell, BookOpen, ScrollText, Bot, ChevronRight, Check, Star, Share2, Map
 import { useState, useEffect } from "react";
 import NotificationCenter, { getUnreadCount } from "@/components/NotificationCenter";
 import { useI18n } from "@/lib/i18n";
+import { supabase } from "@/integrations/supabase/client";
 
 interface HomeScreenProps {
   onNavigate: (tab: string) => void;
@@ -38,38 +39,18 @@ function computeActive(timings: Record<string, string>): { prayers: PrayerTime[]
   const keys = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
   const now = new Date();
   const nowMins = now.getHours() * 60 + now.getMinutes();
-
-  const pts = keys.map((k) => ({
-    name: k,
-    time: (timings[k] || "").replace(/ \(.*\)/, ""),
-    mins: to24((timings[k] || "0:0").replace(/ \(.*\)/, "")),
-  }));
-
+  const pts = keys.map((k) => ({ name: k, time: (timings[k] || "").replace(/ \(.*\)/, ""), mins: to24((timings[k] || "0:0").replace(/ \(.*\)/, "")) }));
   let activeIdx = -1;
-  for (let i = pts.length - 1; i >= 0; i--) {
-    if (nowMins >= pts[i].mins) { activeIdx = i; break; }
-  }
-
+  for (let i = pts.length - 1; i >= 0; i--) { if (nowMins >= pts[i].mins) { activeIdx = i; break; } }
   let nextIdx = pts.findIndex((p) => p.mins > nowMins);
   let nextIn = 0;
   let nextLabel = "";
-  if (nextIdx === -1) {
-    nextLabel = "Fajr";
-    nextIn = 24 * 60 - nowMins + pts[0].mins;
-  } else {
-    nextLabel = pts[nextIdx].name;
-    nextIn = pts[nextIdx].mins - nowMins;
-  }
-
-  return {
-    prayers: pts.map((p, i) => ({ name: p.name, time: p.time, active: i === activeIdx })),
-    nextLabel,
-    nextIn: formatCountdown(nextIn),
-  };
+  if (nextIdx === -1) { nextLabel = "Fajr"; nextIn = 24 * 60 - nowMins + pts[0].mins; } else { nextLabel = pts[nextIdx].name; nextIn = pts[nextIdx].mins - nowMins; }
+  return { prayers: pts.map((p, i) => ({ name: p.name, time: p.time, active: i === activeIdx })), nextLabel, nextIn: formatCountdown(nextIn) };
 }
 
 const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
-  const { t, isRtl, currentLanguage } = useI18n();
+  const { t, isRtl } = useI18n();
   const [prayers, setPrayers] = useState<PrayerTime[]>([]);
   const [nextPrayer, setNextPrayer] = useState({ label: "", time: "" });
   const [locationDenied, setLocationDenied] = useState(false);
@@ -77,11 +58,30 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
   const [loadingPrayer, setLoadingPrayer] = useState(true);
   const [showNotifCenter, setShowNotifCenter] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [firstName, setFirstName] = useState("Guest");
 
   useEffect(() => {
     setUnreadCount(getUnreadCount());
     const interval = setInterval(() => setUnreadCount(getUnreadCount()), 10000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Get real user name
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      // Try user metadata first (from signup)
+      const metaName = user.user_metadata?.full_name || user.user_metadata?.name;
+      if (metaName) {
+        setFirstName(metaName.split(" ")[0]);
+        return;
+      }
+      // Fallback to email username
+      if (user.email) {
+        setFirstName(user.email.split("@")[0]);
+      }
+    })();
   }, []);
 
   const fetchTimings = async (lat: number, lng: number) => {
@@ -93,7 +93,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
       const { prayers: p, nextLabel, nextIn } = computeActive(timings);
       setPrayers(p);
       setNextPrayer({ label: nextLabel, time: nextIn });
-    } catch { /* fallback */ }
+    } catch {}
     setLoadingPrayer(false);
   };
 
@@ -108,7 +108,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
       const { prayers: p, nextLabel, nextIn } = computeActive(timings);
       setPrayers(p);
       setNextPrayer({ label: nextLabel, time: nextIn });
-    } catch { /* */ }
+    } catch {}
     setLoadingPrayer(false);
   };
 
@@ -127,7 +127,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
       <div className="flex items-start justify-between">
         <div>
           <p className="font-arabic text-accent" style={{ fontSize: 14 }}>السلام عليكم ورحمة الله</p>
-          <h1 className="text-foreground font-bold mt-1" style={{ fontSize: 28 }}>Ahmad! 👋</h1>
+          <h1 className="text-foreground font-bold mt-1" style={{ fontSize: 28 }}>{firstName}! 👋</h1>
         </div>
         <div className="flex gap-2">
           <button onClick={() => onNavigate("profile")} className="flex items-center justify-center rounded-full transition-all active:scale-90" style={{ width: 40, height: 40, background: "rgba(37,165,102,0.15)" }}>
@@ -159,14 +159,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
               <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{t("enterCity")}</span>
             </div>
             <div className="flex gap-2">
-              <input
-                value={cityQuery}
-                onChange={(e) => setCityQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && fetchByCity(cityQuery)}
-                placeholder="e.g. London, Dubai, Karachi"
-                className="flex-1 bg-transparent outline-none px-3 py-2"
-                style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, fontSize: 13, color: "#F0F4F0", border: "1px solid rgba(255,255,255,0.08)" }}
-              />
+              <input value={cityQuery} onChange={(e) => setCityQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && fetchByCity(cityQuery)} placeholder="e.g. London, Dubai, Karachi" className="flex-1 bg-transparent outline-none px-3 py-2" style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, fontSize: 13, color: "#F0F4F0", border: "1px solid rgba(255,255,255,0.08)" }} />
               <button onClick={() => fetchByCity(cityQuery)} className="px-3 rounded-lg" style={{ background: "#25A566", color: "#fff", fontSize: 12, fontWeight: 600 }}>
                 <Search size={16} />
               </button>
@@ -209,7 +202,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
         <p className="mt-2" style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>Verily, with every difficulty comes ease.</p>
         <div className="flex items-center justify-between mt-4">
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>Al-Inshirah 94:6</span>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ border: "1px solid #C9A84C", color: "#C9A84C", fontSize: 12, fontWeight: 600 }}>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full active:scale-90 transition-transform" style={{ border: "1px solid #C9A84C", color: "#C9A84C", fontSize: 12, fontWeight: 600 }}>
             {t("share")} <Share2 size={12} />
           </button>
         </div>
@@ -234,7 +227,7 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
         <button onClick={() => onNavigate("quran")} className="text-left p-4 active:scale-[0.96] transition-transform" style={{ background: "linear-gradient(135deg, #1A2820, #0D4D2E)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20 }}>
           <BookOpen size={24} className="text-primary mb-2" />
           <p className="text-foreground font-bold" style={{ fontSize: 15 }}>{t("quran")}</p>
-          <p className="text-muted-foreground" style={{ fontSize: 11, marginTop: 2 }}>Al-Baqarah • Ayah 45</p>
+          <p className="text-muted-foreground" style={{ fontSize: 11, marginTop: 2 }}>Mushaf View</p>
           <div className="mt-3 rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.08)" }}>
             <div className="h-full rounded-full" style={{ width: "34%", background: "#25A566" }} />
           </div>
@@ -242,12 +235,24 @@ const HomeScreen = ({ onNavigate }: HomeScreenProps) => {
         <button onClick={() => onNavigate("hadith")} className="text-left p-4 active:scale-[0.96] transition-transform" style={{ background: "linear-gradient(135deg, #1A1008, #3D1A00)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20 }}>
           <ScrollText size={24} className="text-accent mb-2" />
           <p className="text-foreground font-bold" style={{ fontSize: 15 }}>{t("hadith")}</p>
-          <p className="text-muted-foreground" style={{ fontSize: 11, marginTop: 2 }}>Bukhari • 1,124 read</p>
+          <p className="text-muted-foreground" style={{ fontSize: 11, marginTop: 2 }}>Book Reader</p>
           <div className="mt-3 rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.08)" }}>
             <div className="h-full rounded-full" style={{ width: "18%", background: "#C9A84C" }} />
           </div>
         </button>
       </div>
+
+      {/* NoorDetect banner */}
+      <button onClick={() => onNavigate("noordetect")} className="w-full flex items-center gap-3 mt-3 active:scale-[0.98] transition-transform" style={{ background: "linear-gradient(135deg, rgba(109,40,217,0.12), rgba(201,168,76,0.08))", border: "1px solid rgba(201,168,76,0.25)", borderRadius: 20, padding: 18 }}>
+        <div className="flex items-center justify-center rounded-xl" style={{ width: 40, height: 40, background: "linear-gradient(135deg, #6D28D9, #4C1D95)" }}>
+          <span style={{ fontSize: 20 }}>✨</span>
+        </div>
+        <div className="flex-1 text-left">
+          <p style={{ fontSize: 15, fontWeight: 800, color: "#C9A84C" }}>NoorDetect</p>
+          <p className="text-muted-foreground" style={{ fontSize: 12 }}>Identify any verse by reciting</p>
+        </div>
+        <ChevronRight size={18} style={{ color: "rgba(255,255,255,0.2)" }} />
+      </button>
 
       {/* AI Banner */}
       <button onClick={() => onNavigate("ai")} className="w-full flex items-center gap-3 mt-3 mb-4 active:scale-[0.98] transition-transform" style={{ background: "rgba(109,40,217,0.12)", border: "1px solid rgba(109,40,217,0.25)", borderRadius: 20, padding: 18 }}>
