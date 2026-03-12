@@ -45,7 +45,7 @@ const SettingsScreen = ({ onBack, onNavigate }: SettingsScreenProps) => {
   const [arabicSize, setArabicSize] = useState(() => Number(localStorage.getItem("quran_arabic_size") || "26"));
   const [transLang, setTransLang] = useState(() => localStorage.getItem("quran_trans_lang") || "en");
   const [showTrans, setShowTrans] = useState(() => localStorage.getItem("quran_show_trans") !== "false");
-  const [reciter, setReciter] = useState(() => localStorage.getItem("quran_reciter") || "Mishary Alafasy");
+  const [reciter, setReciter] = useState(() => localStorage.getItem("quran_qari") || "ar.alafasy");
   const [tajweed, setTajweed] = useState(() => localStorage.getItem("quran_tajweed") !== "false");
 
   // Hifz settings
