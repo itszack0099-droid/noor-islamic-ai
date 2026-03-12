@@ -11,9 +11,14 @@ interface SettingsScreenProps {
 }
 
 const RECITERS = [
-  "Abdul Basit", "Mishary Alafasy", "Abdul Rahman Al-Sudais", "Saud Al-Shuraim",
-  "Maher Al Muaiqly", "Saad Al-Ghamdi", "Ahmed Al Ajmi", "Hani Ar-Rifai",
-  "Yasser Ad-Dossari", "Abu Bakr Al-Shatri", "Nasser Al Qatami", "Muhammad Ayyub",
+  { id: "ar.alafasy", name: "Mishary Alafasy" },
+  { id: "ar.abdulbasitmurattal", name: "Abdul Basit" },
+  { id: "ar.mahmoudkhalil", name: "Mahmoud Khalil" },
+  { id: "ar.saadalghamdi", name: "Saad Al-Ghamdi" },
+  { id: "ar.minshawi", name: "Mohamed Siddiq" },
+  { id: "ar.shaatree", name: "Abu Bakr Shatri" },
+  { id: "ar.hanirifai", name: "Hani Rifai" },
+  { id: "ar.mahermuaiqly", name: "Maher Al-Muaiqly" },
 ];
 
 const TRANSLATION_LANGS = [
