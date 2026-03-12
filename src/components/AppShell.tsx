@@ -6,45 +6,33 @@ import HadithScreen from "../pages/HadithScreen";
 import SearchScreen from "../pages/SearchScreen";
 import AIChatScreen from "../pages/AIChatScreen";
 import ProgressDashboard from "../pages/ProgressDashboard";
-import NoorDetectScreen from "../pages/NoorDetectScreen";
 import NotificationSettingsScreen from "./NotificationSettings";
 import LanguageSettings from "./LanguageSettings";
 import BookmarksScreen from "./BookmarksScreen";
 import ProfileScreen from "./ProfileScreen";
-import SettingsScreen from "./SettingsScreen";
 import { startNotificationScheduler } from "@/lib/notificationScheduler";
 import { useI18n } from "@/lib/i18n";
 
 const AppShell = () => {
   const [activeTab, setActiveTab] = useState("home");
   const { isRtl } = useI18n();
-  const [quranInitialPage, setQuranInitialPage] = useState<number | undefined>();
-  const [quranHighlightAyah, setQuranHighlightAyah] = useState<number | undefined>();
 
   useEffect(() => {
     startNotificationScheduler();
   }, []);
 
-  const openQuranPage = (page: number, ayah: number) => {
-    setQuranInitialPage(page);
-    setQuranHighlightAyah(ayah);
-    setActiveTab("quran");
-  };
-
   const renderScreen = () => {
     switch (activeTab) {
       case "home": return <HomeScreen onNavigate={setActiveTab} />;
-      case "quran": return <QuranScreen onBack={() => setActiveTab("home")} initialPage={quranInitialPage} highlightAyah={quranHighlightAyah} />;
+      case "quran": return <QuranScreen onBack={() => setActiveTab("home")} />;
       case "hadith": return <HadithScreen onBack={() => setActiveTab("home")} onOpenLanguageSettings={() => setActiveTab("lang-settings")} />;
-      case "search": return <SearchScreen onNavigateNoorDetect={() => setActiveTab("noordetect")} />;
+      case "search": return <SearchScreen />;
       case "ai": return <AIChatScreen />;
       case "progress": return <ProgressDashboard onBack={() => setActiveTab("home")} onNavigate={setActiveTab} />;
       case "notif-settings": return <NotificationSettingsScreen onBack={() => setActiveTab("home")} />;
       case "lang-settings": return <LanguageSettings onBack={() => setActiveTab("home")} />;
       case "bookmarks": return <BookmarksScreen onBack={() => setActiveTab("home")} />;
       case "profile": return <ProfileScreen onBack={() => setActiveTab("home")} onNavigate={setActiveTab} />;
-      case "noordetect": return <NoorDetectScreen onBack={() => setActiveTab("home")} onOpenQuranPage={openQuranPage} />;
-      case "settings": return <SettingsScreen onBack={() => setActiveTab("home")} onNavigate={setActiveTab} />;
       default: return <HomeScreen onNavigate={setActiveTab} />;
     }
   };
@@ -62,7 +50,7 @@ const AppShell = () => {
       >
         {renderScreen()}
       </div>
-      <TabBar activeTab={activeTab} onTabChange={(tab) => { setQuranInitialPage(undefined); setQuranHighlightAyah(undefined); setActiveTab(tab); }} />
+      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 };
