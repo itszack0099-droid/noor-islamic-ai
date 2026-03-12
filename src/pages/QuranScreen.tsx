@@ -4,6 +4,8 @@ import VerseIdentifier from "@/components/VerseIdentifier";
 import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 import QuranAudioPlayer from "@/components/QuranAudioPlayer";
 import ShareCardSheet from "@/components/ShareCardSheet";
+import TarteelMode from "@/components/TarteelMode";
+import HifzAI from "@/components/HifzAI";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
@@ -73,6 +75,8 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [shareAyah, setShareAyah] = useState<{ arabic: string; translation: string; reference: string } | null>(null);
   const [bookmarkedRefs, setBookmarkedRefs] = useState<Set<string>>(new Set());
   const [showIdentifier, setShowIdentifier] = useState(false);
+  const [tarteelAyahIdx, setTarteelAyahIdx] = useState<number | null>(null);
+  const [showHifzAI, setShowHifzAI] = useState(false);
 
   const handleOpenInQuran = (surahNum: number, _ayahNum: number) => {
     const surah = surahs.find(s => s.number === surahNum);
@@ -212,6 +216,11 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const needsReviewCount = Object.values(hifzRecords).filter(r => r.memorized && new Date(r.last_practiced_at).getTime() < sevenDaysAgo).length;
 
+  // =================== HIFZ AI MODE ===================
+  if (showHifzAI) {
+    return <HifzAI surahs={surahs} onBack={() => setShowHifzAI(false)} />;
+  }
+
   // =================== SURAH LIST ===================
   if (!selectedSurah) {
     return (
@@ -226,7 +235,19 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
               <Search size={18} className="text-foreground" />
             </button>
           </div>
-        </div>
+          </div>
+          {/* HifzAI button */}
+          <button
+            onClick={() => setShowHifzAI(true)}
+            className="mx-5 mb-2 flex items-center gap-3 px-4 py-3 rounded-2xl active:scale-95 transition-transform"
+            style={{ background: "linear-gradient(135deg, rgba(109,40,217,0.15), rgba(201,168,76,0.1))", border: "1px solid rgba(109,40,217,0.25)" }}
+          >
+            <Brain size={20} style={{ color: "#A78BFA" }} />
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "#A78BFA" }}>🧠 HifzAI</p>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>AI-powered memorization checker</p>
+            </div>
+          </button>
         <div className="px-4 py-3">
           {loadingSurahs
             ? Array.from({ length: 12 }).map((_, i) => (
@@ -661,6 +682,40 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
       {/* Audio player */}
       {selectedSurah && ayahs.length > 0 && !hifzMode && (
         <QuranAudioPlayer ayahs={ayahs} surahName={selectedSurah.englishName} surahNumber={selectedSurah.number} playingAyahIdx={audioAyahIdx} onPlayAyah={setAudioAyahIdx} />
+      )}
+
+      {/* Tarteel floating mic button (non-hifz mode) */}
+      {!hifzMode && !listening && ayahs.length > 0 && (
+        <div className="fixed bottom-24 right-4 z-40">
+          <button
+            onClick={() => setTarteelAyahIdx(activeAyahIdx)}
+            className="flex items-center justify-center rounded-full shadow-lg active:scale-95 transition-transform"
+            style={{
+              width: 60, height: 60,
+              background: "linear-gradient(135deg, #25A566, #1A7A4A)",
+              boxShadow: "0 4px 24px rgba(37,165,102,0.5)",
+            }}
+          >
+            <Mic size={24} style={{ color: "#fff" }} />
+          </button>
+          <p className="text-center mt-1" style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>Tarteel</p>
+        </div>
+      )}
+
+      {/* Tarteel Mode overlay */}
+      {tarteelAyahIdx !== null && ayahs[tarteelAyahIdx] && (
+        <TarteelMode
+          ayahText={ayahs[tarteelAyahIdx].text}
+          ayahNumber={ayahs[tarteelAyahIdx].numberInSurah}
+          surahName={selectedSurah.englishName}
+          onComplete={(correct, total) => {
+            if (correct === total) {
+              toast.success("Masha'Allah! Perfect recitation! 🎉");
+              markMemorized(ayahs[tarteelAyahIdx].numberInSurah, 100);
+            }
+          }}
+          onClose={() => setTarteelAyahIdx(null)}
+        />
       )}
 
       <CrossReferenceSheet open={!!crossRefAyah} onClose={() => setCrossRefAyah(null)} type="quran_to_hadith" text={crossRefAyah?.text || ""} reference={crossRefAyah?.reference || ""} />
