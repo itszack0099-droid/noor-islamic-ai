@@ -129,7 +129,7 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
 
     try {
       const [versesRes, transRes] = await Promise.all([
-        fetch(`https://api.quran.com/api/v4/verses/by_page/${pageNum}?language=en&words=true&word_fields=text_uthmani,char_type_name&per_page=50`),
+        fetch(`https://api.quran.com/api/v4/verses/by_page/${pageNum}?language=en&words=true&word_fields=text_uthmani,char_type_name&word_translation_language=en&per_page=50`),
         fetch(`https://api.quran.com/api/v4/verses/by_page/${pageNum}?language=en&translations=131&per_page=50`),
       ]);
       const versesData = await versesRes.json();
