@@ -515,10 +515,18 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
                               key={word.id}
                               data-index={globalIdx}
                               data-ayah={verse.verse_number}
-                              className={`inline-block font-arabic transition-all duration-200 rounded-md px-1 py-0.5
+                              className={`inline-block font-arabic transition-all duration-200 rounded-md px-1 py-0.5 cursor-pointer
                                 ${hifzMode && !status && !isWaiting ? "" : ""}
                                 ${isWaiting ? "animate-pulse" : ""}
                               `}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!hifzMode && word.translation) {
+                                  const rect = (e.target as HTMLElement).getBoundingClientRect();
+                                  setSelectedWord({ word, x: rect.left + rect.width / 2, y: rect.bottom + 8 });
+                                  setTimeout(() => setSelectedWord(null), 3000);
+                                }
+                              }}
                               style={{
                                 fontSize: arabicFontSize,
                                 color: status === "correct" ? "#4ADE80"
