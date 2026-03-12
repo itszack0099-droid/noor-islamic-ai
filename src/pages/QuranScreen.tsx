@@ -91,6 +91,9 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
   // Share
   const [shareAyah, setShareAyah] = useState<{ arabic: string; translation: string; reference: string } | null>(null);
 
+  // Word popup
+  const [selectedWord, setSelectedWord] = useState<{ word: PageWord; x: number; y: number } | null>(null);
+
   // Highlight
   const [highlightedAyahKey, setHighlightedAyahKey] = useState<string | null>(null);
 
