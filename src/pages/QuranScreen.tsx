@@ -165,6 +165,8 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
           text_uthmani: w.text_uthmani,
           char_type_name: w.char_type_name || "word",
           verse_key: v.verse_key,
+          translation: w.translation?.text || "",
+          transliteration: w.transliteration?.text || "",
         })),
         translation: transMap[v.verse_key] || "",
       }));
