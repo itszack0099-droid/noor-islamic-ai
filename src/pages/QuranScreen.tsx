@@ -593,6 +593,18 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
                 );
               })}
 
+              {/* Tajweed Legend */}
+              {showTajweed && (
+                <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
+                  {TAJWEED_LEGEND.map((t) => (
+                    <div key={t.label} className="flex items-center gap-1">
+                      <div className="rounded-full" style={{ width: 8, height: 8, background: t.color }} />
+                      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>{t.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Page number */}
               <p className="text-center mt-4" style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>
                 — {currentPage} —
@@ -601,6 +613,37 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
           ) : null}
         </div>
       </div>
+
+      {/* Word Translation Popup */}
+      {selectedWord && (
+        <div
+          className="fixed z-[80] animate-fade-slide-in"
+          style={{
+            left: Math.min(Math.max(selectedWord.x - 100, 16), 193),
+            top: selectedWord.y,
+            width: 200,
+          }}
+          onClick={() => setSelectedWord(null)}
+        >
+          <div className="p-3 rounded-xl" style={{ background: "#111A14", border: "1px solid rgba(201,168,76,0.4)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+            <p className="font-arabic text-center" dir="rtl" style={{ fontSize: 20, color: "#F0D080" }}>
+              {selectedWord.word.text_uthmani}
+            </p>
+            <div className="h-px my-2" style={{ background: "rgba(201,168,76,0.2)" }} />
+            {selectedWord.word.transliteration && (
+              <p className="text-center italic" style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
+                {selectedWord.word.transliteration}
+              </p>
+            )}
+            <p className="text-center mt-1" style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
+              {selectedWord.word.translation || "—"}
+            </p>
+            <button onClick={() => setSelectedWord(null)} className="w-full text-center mt-2" style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>
+              ✕ Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Hifz live text */}
       {hifzMode && isRecording && liveText && (
