@@ -20,6 +20,8 @@ interface PageWord {
   text_uthmani: string;
   char_type_name: string;
   verse_key: string;
+  translation?: string;
+  transliteration?: string;
 }
 
 interface PageVerse {
@@ -42,7 +44,17 @@ const TAJWEED_COLORS: Record<string, string> = {
   madd: "#60A5FA",
   qalqalah: "#F97316",
   idgham: "#A78BFA",
+  idgham_ghunnah: "#A78BFA",
+  ikhfa: "#FB923C",
+  iqlab: "#F472B6",
 };
+
+const TAJWEED_LEGEND = [
+  { color: "#4ADE80", label: "Ghunnah" },
+  { color: "#60A5FA", label: "Madd" },
+  { color: "#F97316", label: "Qalqalah" },
+  { color: "#A78BFA", label: "Idgham" },
+];
 
 const TOTAL_PAGES = 604;
 
@@ -79,6 +91,9 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
   // Share
   const [shareAyah, setShareAyah] = useState<{ arabic: string; translation: string; reference: string } | null>(null);
 
+  // Word popup
+  const [selectedWord, setSelectedWord] = useState<{ word: PageWord; x: number; y: number } | null>(null);
+
   // Highlight
   const [highlightedAyahKey, setHighlightedAyahKey] = useState<string | null>(null);
 
@@ -114,7 +129,7 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
 
     try {
       const [versesRes, transRes] = await Promise.all([
-        fetch(`https://api.quran.com/api/v4/verses/by_page/${pageNum}?language=en&words=true&word_fields=text_uthmani,char_type_name&per_page=50`),
+        fetch(`https://api.quran.com/api/v4/verses/by_page/${pageNum}?language=en&words=true&word_fields=text_uthmani,char_type_name&word_translation_language=en&per_page=50`),
         fetch(`https://api.quran.com/api/v4/verses/by_page/${pageNum}?language=en&translations=131&per_page=50`),
       ]);
       const versesData = await versesRes.json();
@@ -150,6 +165,8 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
           text_uthmani: w.text_uthmani,
           char_type_name: w.char_type_name || "word",
           verse_key: v.verse_key,
+          translation: w.translation?.text || "",
+          transliteration: w.transliteration?.text || "",
         })),
         translation: transMap[v.verse_key] || "",
       }));
@@ -498,10 +515,18 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
                               key={word.id}
                               data-index={globalIdx}
                               data-ayah={verse.verse_number}
-                              className={`inline-block font-arabic transition-all duration-200 rounded-md px-1 py-0.5
+                              className={`inline-block font-arabic transition-all duration-200 rounded-md px-1 py-0.5 cursor-pointer
                                 ${hifzMode && !status && !isWaiting ? "" : ""}
                                 ${isWaiting ? "animate-pulse" : ""}
                               `}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!hifzMode && word.translation) {
+                                  const rect = (e.target as HTMLElement).getBoundingClientRect();
+                                  setSelectedWord({ word, x: rect.left + rect.width / 2, y: rect.bottom + 8 });
+                                  setTimeout(() => setSelectedWord(null), 3000);
+                                }
+                              }}
                               style={{
                                 fontSize: arabicFontSize,
                                 color: status === "correct" ? "#4ADE80"
@@ -568,6 +593,18 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
                 );
               })}
 
+              {/* Tajweed Legend */}
+              {showTajweed && (
+                <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
+                  {TAJWEED_LEGEND.map((t) => (
+                    <div key={t.label} className="flex items-center gap-1">
+                      <div className="rounded-full" style={{ width: 8, height: 8, background: t.color }} />
+                      <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>{t.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Page number */}
               <p className="text-center mt-4" style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>
                 — {currentPage} —
@@ -576,6 +613,37 @@ const QuranScreen = ({ onBack, initialPage, highlightAyah }: QuranScreenProps) =
           ) : null}
         </div>
       </div>
+
+      {/* Word Translation Popup */}
+      {selectedWord && (
+        <div
+          className="fixed z-[80] animate-fade-slide-in"
+          style={{
+            left: Math.min(Math.max(selectedWord.x - 100, 16), 193),
+            top: selectedWord.y,
+            width: 200,
+          }}
+          onClick={() => setSelectedWord(null)}
+        >
+          <div className="p-3 rounded-xl" style={{ background: "#111A14", border: "1px solid rgba(201,168,76,0.4)", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+            <p className="font-arabic text-center" dir="rtl" style={{ fontSize: 20, color: "#F0D080" }}>
+              {selectedWord.word.text_uthmani}
+            </p>
+            <div className="h-px my-2" style={{ background: "rgba(201,168,76,0.2)" }} />
+            {selectedWord.word.transliteration && (
+              <p className="text-center italic" style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
+                {selectedWord.word.transliteration}
+              </p>
+            )}
+            <p className="text-center mt-1" style={{ fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
+              {selectedWord.word.translation || "—"}
+            </p>
+            <button onClick={() => setSelectedWord(null)} className="w-full text-center mt-2" style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>
+              ✕ Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Hifz live text */}
       {hifzMode && isRecording && liveText && (
