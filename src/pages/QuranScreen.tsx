@@ -44,7 +44,17 @@ const TAJWEED_COLORS: Record<string, string> = {
   madd: "#60A5FA",
   qalqalah: "#F97316",
   idgham: "#A78BFA",
+  idgham_ghunnah: "#A78BFA",
+  ikhfa: "#FB923C",
+  iqlab: "#F472B6",
 };
+
+const TAJWEED_LEGEND = [
+  { color: "#4ADE80", label: "Ghunnah" },
+  { color: "#60A5FA", label: "Madd" },
+  { color: "#F97316", label: "Qalqalah" },
+  { color: "#A78BFA", label: "Idgham" },
+];
 
 const TOTAL_PAGES = 604;
 
