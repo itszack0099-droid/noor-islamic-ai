@@ -116,8 +116,8 @@ const SettingsScreen = ({ onBack, onNavigate }: SettingsScreenProps) => {
           } />
           <Row label="Show Translation" right={<Toggle value={showTrans} onChange={v => { setShowTrans(v); save("quran_show_trans", String(v)); }} />} />
           <Row label="Reciter" right={
-            <select value={reciter} onChange={e => { setReciter(e.target.value); save("quran_reciter", e.target.value); }} className="bg-transparent text-right outline-none max-w-[140px]" style={{ fontSize: 12, color: "#25A566" }}>
-              {RECITERS.map(r => <option key={r} value={r}>{r}</option>)}
+            <select value={reciter} onChange={e => { setReciter(e.target.value); save("quran_qari", e.target.value); }} className="bg-transparent text-right outline-none max-w-[140px]" style={{ fontSize: 12, color: "#25A566" }}>
+              {RECITERS.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           } />
           <Row label="Tajweed Colors" right={<Toggle value={tajweed} onChange={v => { setTajweed(v); save("quran_tajweed", String(v)); }} />} />
