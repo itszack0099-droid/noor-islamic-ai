@@ -11,9 +11,14 @@ interface SettingsScreenProps {
 }
 
 const RECITERS = [
-  "Abdul Basit", "Mishary Alafasy", "Abdul Rahman Al-Sudais", "Saud Al-Shuraim",
-  "Maher Al Muaiqly", "Saad Al-Ghamdi", "Ahmed Al Ajmi", "Hani Ar-Rifai",
-  "Yasser Ad-Dossari", "Abu Bakr Al-Shatri", "Nasser Al Qatami", "Muhammad Ayyub",
+  { id: "ar.alafasy", name: "Mishary Alafasy" },
+  { id: "ar.abdulbasitmurattal", name: "Abdul Basit" },
+  { id: "ar.mahmoudkhalil", name: "Mahmoud Khalil" },
+  { id: "ar.saadalghamdi", name: "Saad Al-Ghamdi" },
+  { id: "ar.minshawi", name: "Mohamed Siddiq" },
+  { id: "ar.shaatree", name: "Abu Bakr Shatri" },
+  { id: "ar.hanirifai", name: "Hani Rifai" },
+  { id: "ar.mahermuaiqly", name: "Maher Al-Muaiqly" },
 ];
 
 const TRANSLATION_LANGS = [
@@ -40,7 +45,7 @@ const SettingsScreen = ({ onBack, onNavigate }: SettingsScreenProps) => {
   const [arabicSize, setArabicSize] = useState(() => Number(localStorage.getItem("quran_arabic_size") || "26"));
   const [transLang, setTransLang] = useState(() => localStorage.getItem("quran_trans_lang") || "en");
   const [showTrans, setShowTrans] = useState(() => localStorage.getItem("quran_show_trans") !== "false");
-  const [reciter, setReciter] = useState(() => localStorage.getItem("quran_reciter") || "Mishary Alafasy");
+  const [reciter, setReciter] = useState(() => localStorage.getItem("quran_qari") || "ar.alafasy");
   const [tajweed, setTajweed] = useState(() => localStorage.getItem("quran_tajweed") !== "false");
 
   // Hifz settings
@@ -111,8 +116,8 @@ const SettingsScreen = ({ onBack, onNavigate }: SettingsScreenProps) => {
           } />
           <Row label="Show Translation" right={<Toggle value={showTrans} onChange={v => { setShowTrans(v); save("quran_show_trans", String(v)); }} />} />
           <Row label="Reciter" right={
-            <select value={reciter} onChange={e => { setReciter(e.target.value); save("quran_reciter", e.target.value); }} className="bg-transparent text-right outline-none max-w-[140px]" style={{ fontSize: 12, color: "#25A566" }}>
-              {RECITERS.map(r => <option key={r} value={r}>{r}</option>)}
+            <select value={reciter} onChange={e => { setReciter(e.target.value); save("quran_qari", e.target.value); }} className="bg-transparent text-right outline-none max-w-[140px]" style={{ fontSize: 12, color: "#25A566" }}>
+              {RECITERS.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           } />
           <Row label="Tajweed Colors" right={<Toggle value={tajweed} onChange={v => { setTajweed(v); save("quran_tajweed", String(v)); }} />} />
