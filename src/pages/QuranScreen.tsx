@@ -20,6 +20,8 @@ interface PageWord {
   text_uthmani: string;
   char_type_name: string;
   verse_key: string;
+  translation?: string;
+  transliteration?: string;
 }
 
 interface PageVerse {
