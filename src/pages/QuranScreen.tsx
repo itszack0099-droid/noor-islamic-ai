@@ -5,13 +5,15 @@ import CrossReferenceSheet from "@/components/CrossReferenceSheet";
 import QuranAudioPlayer from "@/components/QuranAudioPlayer";
 import ShareCardSheet from "@/components/ShareCardSheet";
 import TarteelMode from "@/components/TarteelMode";
-import HifzAI from "@/components/HifzAI";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { addBookmark, removeBookmarkByRef } from "@/components/BookmarksScreen";
 import { toast } from "sonner";
 import { startBeep, stopBeep } from "@/lib/audioFeedback";
+import { normalizeArabic, levenshtein } from "@/lib/arabicUtils";
+import { groqTranscribe } from "@/lib/arabicUtils";
+import { startChunkRecorder, ChunkRecorder } from "@/lib/chunkRecorder";
 
 interface Surah { number: number; name: string; englishName: string; englishNameTranslation: string; numberOfAyahs: number; revelationType: string; }
 interface Ayah { number: number; numberInSurah: number; text: string; translation: string; secondaryTranslation?: string; }
@@ -23,11 +25,11 @@ interface QuranScreenProps { onBack: () => void; }
 const CACHE_PREFIX = "quran_surah_";
 type HifzLevel = "easy" | "medium" | "hard";
 
+// Word status for real-time hifz highlighting
+type WordHifzStatus = "upcoming" | "current" | "spoken" | "wrong";
+
 function stripDiacritics(s: string) {
   return s.replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7\u06E8\u06EA-\u06ED]/g, "").trim();
-}
-function normalizeArabic(s: string) {
-  return stripDiacritics(s).replace(/\u0671/g, "\u0627").replace(/[\u0622\u0623\u0625]/g, "\u0627").replace(/\u0629/g, "\u0647").replace(/\s+/g, " ").trim();
 }
 function compareWords(expected: string, spoken: string): WordResult[] {
   const expWords = expected.split(/\s+/).filter(Boolean);
@@ -60,7 +62,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [result, setResult] = useState<RecitationResult | null>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Hifz state
+  // Old hifz state (blur/blank mode)
   const [hifzMode, setHifzMode] = useState(false);
   const [hifzLevel, setHifzLevel] = useState<HifzLevel>("medium");
   const [peekingAyah, setPeekingAyah] = useState<number | null>(null);
@@ -69,6 +71,15 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [showProgress, setShowProgress] = useState(false);
   const peekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Real-time Hifz (brain) state
+  const [brainActive, setBrainActive] = useState(false);
+  const [wordStatuses, setWordStatuses] = useState<Record<string, WordHifzStatus>>({});
+  const wordPointerRef = useRef(0);
+  const allWordsRef = useRef<{ ayahIdx: number; wordIdx: number; text: string; key: string }[]>([]);
+  const chunkRecorderRef = useRef<ChunkRecorder | null>(null);
+  const [brainStats, setBrainStats] = useState({ wordsRecited: 0, correct: 0, wrong: 0 });
+  const [showBrainSummary, setShowBrainSummary] = useState(false);
+
   // Other UI state
   const [crossRefAyah, setCrossRefAyah] = useState<{ text: string; reference: string } | null>(null);
   const [audioAyahIdx, setAudioAyahIdx] = useState<number | null>(null);
@@ -76,7 +87,6 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
   const [bookmarkedRefs, setBookmarkedRefs] = useState<Set<string>>(new Set());
   const [showIdentifier, setShowIdentifier] = useState(false);
   const [tarteelAyahIdx, setTarteelAyahIdx] = useState<number | null>(null);
-  const [showHifzAI, setShowHifzAI] = useState(false);
 
   const handleOpenInQuran = (surahNum: number, _ayahNum: number) => {
     const surah = surahs.find(s => s.number === surahNum);
@@ -212,14 +222,134 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
 
   const stopListening = useCallback(() => { recognitionRef.current?.stop(); setListening(false); stopBeep(); }, []);
 
+  // =================== REAL-TIME BRAIN HIFZ ===================
+  const buildWordList = useCallback(() => {
+    const words: typeof allWordsRef.current = [];
+    ayahs.forEach((ayah, aIdx) => {
+      const ayahWords = ayah.text.split(/\s+/).filter(w => w.length > 0);
+      ayahWords.forEach((w, wIdx) => {
+        const key = `${aIdx}-${wIdx}`;
+        words.push({ ayahIdx: aIdx, wordIdx: wIdx, text: w, key });
+      });
+    });
+    return words;
+  }, [ayahs]);
+
+  const toggleBrainMode = useCallback(async () => {
+    if (brainActive) {
+      // Stop
+      chunkRecorderRef.current?.stop();
+      chunkRecorderRef.current = null;
+      setBrainActive(false);
+      stopBeep();
+      setShowBrainSummary(true);
+      return;
+    }
+
+    // Start
+    if (ayahs.length === 0) return;
+
+    const words = buildWordList();
+    allWordsRef.current = words;
+    wordPointerRef.current = 0;
+    setBrainStats({ wordsRecited: 0, correct: 0, wrong: 0 });
+    setShowBrainSummary(false);
+
+    // Initialize statuses
+    const statuses: Record<string, WordHifzStatus> = {};
+    words.forEach((w, i) => {
+      statuses[w.key] = i === 0 ? "current" : "upcoming";
+    });
+    setWordStatuses(statuses);
+
+    try {
+      startBeep();
+      toast("🧠 Hifz Mode Active\nRecite and words will highlight automatically", { duration: 3000 });
+      setBrainActive(true);
+
+      const recorder = await startChunkRecorder(
+        async (chunkBlob) => {
+          const result = await groqTranscribe(chunkBlob);
+
+          // Smart detection: ignore non-Arabic / silence / noise
+          const isArabic = (
+            result.language === "ar" &&
+            result.text?.trim().length > 2 &&
+            (result.noSpeechProb || 1) < 0.5
+          );
+          if (!isArabic || result.lowConfidence || !result.text) return;
+
+          const spokenWords = result.text.split(/\s+/).filter(w => w.length > 0);
+
+          setWordStatuses(prev => {
+            const next = { ...prev };
+            let ptr = wordPointerRef.current;
+            const allWords = allWordsRef.current;
+            let correctCount = 0;
+            let wrongCount = 0;
+
+            for (const spoken of spokenWords) {
+              if (ptr >= allWords.length) break;
+              const expected = allWords[ptr];
+              const normS = normalizeArabic(spoken);
+              const normE = normalizeArabic(expected.text);
+              const dist = levenshtein(normS, normE);
+
+              if (dist <= 2) {
+                // Correct or close enough
+                next[expected.key] = "spoken";
+                correctCount++;
+                ptr++;
+              } else {
+                // Wrong
+                next[expected.key] = "wrong";
+                wrongCount++;
+                // Vibrate
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                toast(`Try again: ${expected.text}`, { duration: 2000 });
+                ptr++;
+              }
+            }
+
+            // Set new current word
+            if (ptr < allWords.length) {
+              next[allWords[ptr].key] = "current";
+            }
+
+            wordPointerRef.current = ptr;
+
+            setBrainStats(s => ({
+              wordsRecited: s.wordsRecited + correctCount + wrongCount,
+              correct: s.correct + correctCount,
+              wrong: s.wrong + wrongCount,
+            }));
+
+            return next;
+          });
+        },
+        async () => {
+          // onStop - no-op, summary shown when brain toggled off
+        },
+        { disableSilenceDetection: true }
+      );
+
+      chunkRecorderRef.current = recorder;
+    } catch {
+      toast.error("Microphone access required");
+      setBrainActive(false);
+    }
+  }, [brainActive, ayahs, buildWordList]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      chunkRecorderRef.current?.stop();
+    };
+  }, []);
+
   const memorizedCount = Object.values(hifzRecords).filter(r => r.memorized).length;
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const needsReviewCount = Object.values(hifzRecords).filter(r => r.memorized && new Date(r.last_practiced_at).getTime() < sevenDaysAgo).length;
-
-  // =================== HIFZ AI MODE ===================
-  if (showHifzAI) {
-    return <HifzAI surahs={surahs} onBack={() => setShowHifzAI(false)} />;
-  }
 
   // =================== SURAH LIST ===================
   if (!selectedSurah) {
@@ -235,19 +365,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
               <Search size={18} className="text-foreground" />
             </button>
           </div>
-          </div>
-          {/* HifzAI button */}
-          <button
-            onClick={() => setShowHifzAI(true)}
-            className="mx-5 mb-2 flex items-center gap-3 px-4 py-3 rounded-2xl active:scale-95 transition-transform"
-            style={{ background: "linear-gradient(135deg, rgba(109,40,217,0.15), rgba(201,168,76,0.1))", border: "1px solid rgba(109,40,217,0.25)" }}
-          >
-            <Brain size={20} style={{ color: "#A78BFA" }} />
-            <div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: "#A78BFA" }}>🧠 HifzAI</p>
-              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>AI-powered memorization checker</p>
-            </div>
-          </button>
+        </div>
         <div className="px-4 py-3">
           {loadingSurahs
             ? Array.from({ length: 12 }).map((_, i) => (
@@ -288,7 +406,6 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
         </div>
 
         <div className="px-5 py-4">
-          {/* Stats cards */}
           <div className="flex gap-3">
             {[
               { label: t("memorized"), count: memorizedCount, color: "#25A566", icon: "⭐" },
@@ -303,7 +420,6 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
             ))}
           </div>
 
-          {/* Progress bar */}
           <div className="mt-4 rounded-full overflow-hidden" style={{ height: 8, background: "rgba(255,255,255,0.08)" }}>
             <div className="h-full rounded-full transition-all" style={{ width: `${ayahs.length > 0 ? (memorizedCount / ayahs.length) * 100 : 0}%`, background: "linear-gradient(90deg, #25A566, #1A7A4A)" }} />
           </div>
@@ -311,7 +427,6 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
             {memorizedCount}/{ayahs.length} ayaat memorized
           </p>
 
-          {/* Daily revision target */}
           {needsReviewCount > 0 && (
             <div className="mt-4 p-3 rounded-xl flex items-center gap-3" style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}>
               <AlertTriangle size={18} style={{ color: "#f59e0b" }} />
@@ -323,7 +438,6 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
           )}
         </div>
 
-        {/* Ayah grid */}
         <div className="px-5 pb-4">
           <p className="mb-2 uppercase font-semibold" style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", letterSpacing: 1 }}>Ayah Map</p>
           <div className="flex flex-wrap gap-1.5">
@@ -341,7 +455,6 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
             })}
           </div>
 
-          {/* Legend */}
           <div className="flex gap-4 mt-3">
             {[
               { color: "#25A566", label: "Memorized" },
@@ -359,13 +472,31 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
     );
   }
 
+  // =================== BRAIN SUMMARY OVERLAY ===================
+  const brainAccuracy = brainStats.wordsRecited > 0 ? Math.round((brainStats.correct / brainStats.wordsRecited) * 100) : 0;
+
+  // Helper to get word style for brain mode
+  const getWordBrainStyle = (key: string) => {
+    const status = wordStatuses[key];
+    switch (status) {
+      case "current":
+        return { color: "#FFD700", textShadow: "0 0 15px rgba(255,215,0,0.8)", transform: "scale(1.15)", transition: "all 0.2s ease" };
+      case "spoken":
+        return { color: "#4ADE80", transition: "all 0.3s ease" };
+      case "wrong":
+        return { color: "#F87171", textDecoration: "underline wavy #F87171" as const, transition: "all 0.3s ease" };
+      default: // upcoming
+        return { color: "#F0D080", opacity: 0.7 };
+    }
+  };
+
   // =================== SURAH DETAIL ===================
   return (
     <div className="min-h-screen" dir={isRtl ? "rtl" : "ltr"}>
       {/* Header */}
       <div style={{ background: "linear-gradient(160deg, #050F08, #0D4D2E)", paddingTop: 12 }}>
         <div className="flex items-center justify-between px-5 py-3">
-          <button onClick={() => { setSelectedSurah(null); setAyahs([]); setResult(null); setListening(false); setHifzMode(false); }} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
+          <button onClick={() => { setSelectedSurah(null); setAyahs([]); setResult(null); setListening(false); setHifzMode(false); if (brainActive) { chunkRecorderRef.current?.stop(); setBrainActive(false); } }} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
             <ChevronLeft size={20} className="text-foreground" />
           </button>
           <h2 className="text-foreground font-bold" style={{ fontSize: 20 }}>{selectedSurah.englishName}</h2>
@@ -376,24 +507,39 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
             <button onClick={() => setShowProgress(true)} className="flex items-center justify-center rounded-full" style={{ width: 36, height: 36, background: "rgba(255,255,255,0.08)" }}>
               <BarChart3 size={16} className="text-foreground" />
             </button>
+            {/* BRAIN BUTTON - Real-time Hifz */}
             <button
-              onClick={() => { setHifzMode(!hifzMode); if (!hifzMode) setResult(null); }}
-              className="flex items-center justify-center rounded-full transition-all"
+              onClick={toggleBrainMode}
+              className="flex items-center justify-center rounded-full transition-all active:scale-90"
               style={{
                 width: 36, height: 36,
-                background: hifzMode ? "linear-gradient(135deg, #6D28D9, #C9A84C)" : "rgba(255,255,255,0.08)",
-                boxShadow: hifzMode ? "0 0 16px rgba(109,40,217,0.4)" : "none",
+                background: brainActive ? "linear-gradient(135deg, #6D28D9, #C9A84C)" : "rgba(255,255,255,0.08)",
+                boxShadow: brainActive ? "0 0 16px rgba(109,40,217,0.4)" : "none",
               }}
             >
-              <Brain size={16} style={{ color: hifzMode ? "#fff" : "#F0F4F0" }} />
+              <Brain size={16} style={{ color: brainActive ? "#fff" : "#F0F4F0" }} />
             </button>
           </div>
         </div>
 
-        {/* Hifz Mode Active Banner */}
-        {hifzMode && (
+        {/* Brain mode active banner */}
+        {brainActive && (
+          <div className="mx-5 mb-2 flex items-center justify-between px-4 py-2.5 rounded-xl" style={{ background: "linear-gradient(135deg, rgba(109,40,217,0.15), rgba(201,168,76,0.1))", border: "1px solid rgba(109,40,217,0.25)" }}>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: "#ef4444" }} />
+              <Brain size={14} style={{ color: "#A78BFA" }} />
+              <span style={{ fontSize: 12, color: "#A78BFA", fontWeight: 700 }}>🧠 Hifz Mode Active</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span style={{ fontSize: 11, color: "#4ADE80" }}>✓ {brainStats.correct}</span>
+              <span style={{ fontSize: 11, color: "#F87171" }}>✗ {brainStats.wrong}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Old Hifz Mode Banner (blur/blank) */}
+        {hifzMode && !brainActive && (
           <div className="mx-5 mb-2">
-            {/* Status bar */}
             <div className="flex items-center justify-between px-4 py-2.5" style={{ background: "linear-gradient(135deg, rgba(109,40,217,0.15), rgba(201,168,76,0.1))", borderRadius: "12px 12px 0 0", border: "1px solid rgba(109,40,217,0.25)", borderBottom: "none" }}>
               <div className="flex items-center gap-2">
                 <Brain size={14} style={{ color: "#A78BFA" }} />
@@ -401,8 +547,6 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>· {memorizedCount}/{ayahs.length}</span>
               </div>
             </div>
-
-            {/* Segmented control for levels */}
             <div className="flex p-1" style={{ background: "rgba(109,40,217,0.08)", borderRadius: "0 0 12px 12px", border: "1px solid rgba(109,40,217,0.25)", borderTop: "none" }}>
               {([
                 { key: "easy" as HifzLevel, label: "Easy", desc: "Blurred" },
@@ -461,7 +605,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
       )}
 
       {/* Ayah List */}
-      <div style={{ paddingBottom: hifzMode ? 100 : 0 }}>
+      <div style={{ paddingBottom: hifzMode || brainActive ? 100 : 0 }}>
         {loadingAyahs
           ? Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
@@ -481,13 +625,15 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
               const ref = `${selectedSurah.englishName} ${selectedSurah.number}:${ayah.numberInSurah}`;
               const isSaved = bookmarkedRefs.has(ref);
 
-              // Determine text visibility in hifz mode
-              const inHifz = hifzMode && !hasResult;
+              const inHifz = hifzMode && !brainActive && !hasResult;
               const accuracy = hasResult ? Math.round((result!.score / result!.total) * 100) : 0;
               const canMarkMemorized = hasResult && accuracy >= 80 && !isMemorized;
 
+              // Build word spans for brain mode
+              const ayahWords = ayah.text.split(/\s+/).filter(w => w.length > 0);
+
               return (
-                <div key={ayah.number} className="px-5 py-4 transition-all" style={{
+                <div key={ayah.number} data-ayah={ayah.numberInSurah} className="px-5 py-4 transition-all" style={{
                   borderBottom: "1px solid rgba(255,255,255,0.05)",
                   ...(isListeningThis ? { background: "linear-gradient(90deg, rgba(109,40,217,0.06), rgba(201,168,76,0.04))", borderLeft: "3px solid #A78BFA" } : {}),
                   ...(isAudioPlaying && !hifzMode ? { borderLeft: "3px solid #25A566", background: "rgba(37,165,102,0.04)" } : {}),
@@ -510,7 +656,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                       {peekCount > 0 && hifzMode && <span style={{ fontSize: 10, color: "rgba(201,168,76,0.6)" }}>👁 {peekCount}x</span>}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      {hifzMode && (
+                      {hifzMode && !brainActive && (
                         <button
                           onMouseDown={() => handlePeekStart(ayah.numberInSurah)}
                           onMouseUp={handlePeekEnd}
@@ -523,7 +669,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                           <Eye size={12} /> Peek
                         </button>
                       )}
-                      {hifzMode && (
+                      {hifzMode && !brainActive && (
                         <button
                           onClick={() => { setActiveAyahIdx(idx); setResult(null); startListening(); }}
                           className="flex items-center gap-1 px-2.5 py-1.5 rounded-full"
@@ -532,7 +678,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                           <Mic size={12} /> Recite
                         </button>
                       )}
-                      {!hifzMode && (
+                      {!hifzMode && !brainActive && (
                         <>
                           <button onClick={() => setAudioAyahIdx(audioAyahIdx === idx ? null : idx)} className="flex items-center justify-center rounded-full" style={{ width: 28, height: 28, background: audioAyahIdx === idx ? "rgba(37,165,102,0.25)" : "rgba(255,255,255,0.07)" }}>
                             {audioAyahIdx === idx ? <Pause size={14} style={{ color: "#25A566" }} /> : <Play size={14} className="text-foreground" />}
@@ -552,7 +698,27 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                   </div>
 
                   {/* ===== AYAH TEXT ===== */}
-                  {hasResult ? (
+                  {brainActive ? (
+                    /* Brain mode: word-by-word with live highlighting */
+                    <p className="font-arabic text-right flex flex-wrap justify-end gap-1.5" dir="rtl" style={{ fontSize: 21, lineHeight: 2.2 }}>
+                      {ayahWords.map((word, wi) => {
+                        const key = `${idx}-${wi}`;
+                        const style = getWordBrainStyle(key);
+                        return (
+                          <span
+                            key={key}
+                            className="inline-block px-1.5 py-0.5 rounded-lg transition-all"
+                            style={{
+                              fontSize: 22,
+                              ...style,
+                            }}
+                          >
+                            {word}
+                          </span>
+                        );
+                      })}
+                    </p>
+                  ) : hasResult ? (
                     /* Word-by-word result */
                     <p className="font-arabic text-right flex flex-wrap justify-end gap-1.5" dir="rtl" style={{ fontSize: 21, lineHeight: 2 }}>
                       {result!.words.map((w, wi) => (
@@ -567,17 +733,14 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                     /* Hidden text based on level */
                     <div dir="rtl">
                       {hifzLevel === "easy" ? (
-                        /* Level 1: Blurred */
                         <p className="font-arabic text-right select-none" style={{ fontSize: 21, lineHeight: 1.85, color: "#F0D080", filter: "blur(8px)", WebkitUserSelect: "none", transition: "filter 0.3s" }}>
                           {ayah.text}
                         </p>
                       ) : hifzLevel === "medium" ? (
-                        /* Level 2: Blank lines */
                         <p className="text-right font-mono" style={{ fontSize: 16, lineHeight: 2, color: "rgba(255,255,255,0.12)", letterSpacing: 2 }}>
                           {generateBlankLine(ayah.text)}
                         </p>
                       ) : (
-                        /* Level 3: Hidden completely */
                         <div className="flex items-center justify-center py-4" style={{ background: "rgba(255,255,255,0.02)", borderRadius: 12, border: "1px dashed rgba(255,255,255,0.08)" }}>
                           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.15)" }}>Ayah {ayah.numberInSurah} — Recite from memory</span>
                         </div>
@@ -592,7 +755,7 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                   )}
 
                   {/* Translation (only in normal mode) */}
-                  {!hifzMode && !inHifz && (
+                  {!hifzMode && !brainActive && !inHifz && (
                     <>
                       <p className="mt-2" style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>{ayah.translation}</p>
                       {ayah.secondaryTranslation && (
@@ -604,7 +767,6 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                   {/* ===== RESULT CARD ===== */}
                   {hasResult && (
                     <div className="mt-3 p-4 rounded-2xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                      {/* Score header */}
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <span style={{ fontSize: 15, fontWeight: 700, color: accuracy >= 80 ? "#25A566" : accuracy >= 50 ? "#f59e0b" : "#ef4444" }}>
@@ -622,7 +784,6 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                         </button>
                       </div>
 
-                      {/* Mistakes detail */}
                       {result!.words.filter(w => w.status !== "correct").length > 0 && (
                         <div className="mb-3">
                           <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginBottom: 4 }}>Mistakes:</p>
@@ -641,7 +802,6 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
                         </div>
                       )}
 
-                      {/* Mark as Memorized */}
                       {canMarkMemorized && (
                         <button
                           onClick={() => markMemorized(ayah.numberInSurah, accuracy)}
@@ -662,8 +822,8 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
             })}
       </div>
 
-      {/* ===== FLOATING MIC BUTTON (Hifz Mode) ===== */}
-      {hifzMode && !listening && (
+      {/* ===== FLOATING MIC BUTTON (Old Hifz Mode) ===== */}
+      {hifzMode && !brainActive && !listening && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40" style={{ maxWidth: 393 }}>
           <button
             onClick={() => startListening()}
@@ -680,12 +840,12 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
       )}
 
       {/* Audio player */}
-      {selectedSurah && ayahs.length > 0 && !hifzMode && (
+      {selectedSurah && ayahs.length > 0 && !hifzMode && !brainActive && (
         <QuranAudioPlayer ayahs={ayahs} surahName={selectedSurah.englishName} surahNumber={selectedSurah.number} playingAyahIdx={audioAyahIdx} onPlayAyah={setAudioAyahIdx} />
       )}
 
-      {/* Tarteel floating mic button (non-hifz mode) */}
-      {!hifzMode && !listening && ayahs.length > 0 && (
+      {/* Tarteel floating mic button (non-hifz, non-brain mode) */}
+      {!hifzMode && !brainActive && !listening && ayahs.length > 0 && (
         <div className="fixed bottom-24 right-4 z-40">
           <button
             onClick={() => setTarteelAyahIdx(activeAyahIdx)}
@@ -716,6 +876,50 @@ const QuranScreen = ({ onBack }: QuranScreenProps) => {
           }}
           onClose={() => setTarteelAyahIdx(null)}
         />
+      )}
+
+      {/* Brain Summary Overlay */}
+      {showBrainSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}>
+          <div className="mx-6 p-6 rounded-2xl w-full max-w-sm" style={{ background: "#111A14", border: "1px solid rgba(201,168,76,0.3)" }}>
+            <div className="text-center mb-6">
+              <Brain size={40} style={{ color: "#A78BFA", margin: "0 auto 12px" }} />
+              <h3 className="text-foreground font-bold" style={{ fontSize: 20 }}>🧠 Hifz Summary</h3>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center justify-between px-4 py-3 rounded-xl" style={{ background: "rgba(255,255,255,0.04)" }}>
+                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Words Recited</span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: "#F0D080" }}>{brainStats.wordsRecited}</span>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 rounded-xl" style={{ background: "rgba(74,222,128,0.06)" }}>
+                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Correct</span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: "#4ADE80" }}>{brainStats.correct}</span>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 rounded-xl" style={{ background: "rgba(248,113,113,0.06)" }}>
+                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Wrong</span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: "#F87171" }}>{brainStats.wrong}</span>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 rounded-xl" style={{ background: "rgba(201,168,76,0.08)" }}>
+                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Accuracy</span>
+                <span style={{
+                  fontSize: 24, fontWeight: 800,
+                  color: brainAccuracy >= 90 ? "#4ADE80" : brainAccuracy >= 70 ? "#C9A84C" : "#F87171",
+                }}>
+                  {brainAccuracy}%
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => { setShowBrainSummary(false); setWordStatuses({}); }}
+              className="w-full py-3 rounded-xl font-semibold active:scale-95 transition-transform"
+              style={{ background: "linear-gradient(135deg, #25A566, #1A7A4A)", color: "#fff", fontSize: 14 }}
+            >
+              Done ✓
+            </button>
+          </div>
+        </div>
       )}
 
       <CrossReferenceSheet open={!!crossRefAyah} onClose={() => setCrossRefAyah(null)} type="quran_to_hadith" text={crossRefAyah?.text || ""} reference={crossRefAyah?.reference || ""} />
