@@ -48,30 +48,37 @@ serve(async (req) => {
       const errText = await res.text();
       console.error("Groq API error:", res.status, errText);
       return new Response(
-        JSON.stringify({ error: "Transcription failed", text: "", lowConfidence: true }),
+        JSON.stringify({ error: "Transcription failed", text: "", lowConfidence: true, language: "", noSpeechProb: 1 }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const data = await res.json();
 
-    // Check confidence
     const avgLogProb = data.segments?.[0]?.avg_logprob || -0.5;
+    const noSpeechProb = data.segments?.[0]?.no_speech_prob || 1;
+    const language = data.language || "";
+
     if (avgLogProb < -0.85) {
       return new Response(
-        JSON.stringify({ text: "", lowConfidence: true }),
+        JSON.stringify({ text: "", lowConfidence: true, language, noSpeechProb }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     return new Response(
-      JSON.stringify({ text: data.text?.trim() || "", lowConfidence: false }),
+      JSON.stringify({
+        text: data.text?.trim() || "",
+        lowConfidence: false,
+        language,
+        noSpeechProb,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("groq-transcribe error:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error", text: "", lowConfidence: true }),
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error", text: "", lowConfidence: true, language: "", noSpeechProb: 1 }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
