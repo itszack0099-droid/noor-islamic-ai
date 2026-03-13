@@ -35,8 +35,13 @@ export function arabicWordMatch(spoken: string, expected: string): boolean {
   return false;
 }
 
-// Groq transcribe via edge function
-export async function groqTranscribe(audioBlob: Blob): Promise<{ text: string; lowConfidence: boolean }> {
+// Groq transcribe via edge function - returns extended data for smart detection
+export async function groqTranscribe(audioBlob: Blob): Promise<{
+  text: string;
+  lowConfidence: boolean;
+  language?: string;
+  noSpeechProb?: number;
+}> {
   try {
     const formData = new FormData();
     formData.append('file', audioBlob, 'audio.webm');
@@ -61,6 +66,8 @@ export async function groqTranscribe(audioBlob: Blob): Promise<{ text: string; l
     return {
       text: data.text?.trim() || '',
       lowConfidence: data.lowConfidence || false,
+      language: data.language || '',
+      noSpeechProb: data.noSpeechProb ?? 1,
     };
   } catch (err) {
     console.error('Groq transcribe error:', err);
