@@ -5,9 +5,14 @@ export interface ChunkRecorder {
   recorder: MediaRecorder;
 }
 
+export interface ChunkRecorderOptions {
+  disableSilenceDetection?: boolean;
+}
+
 export async function startChunkRecorder(
   onChunk: (blob: Blob) => Promise<void>,
-  onStop: (fullBlob: Blob) => Promise<void>
+  onStop: (fullBlob: Blob) => Promise<void>,
+  options?: ChunkRecorderOptions
 ): Promise<ChunkRecorder> {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
@@ -55,30 +60,31 @@ export async function startChunkRecorder(
     await onStop(fullBlob);
   };
 
-  // Silence detection
   const ctx = new AudioContext();
   const analyser = ctx.createAnalyser();
   const source = ctx.createMediaStreamSource(stream);
   source.connect(analyser);
   let silenceTimer: ReturnType<typeof setTimeout>;
 
-  const checkSilence = () => {
-    const data = new Uint8Array(analyser.fftSize);
-    analyser.getByteTimeDomainData(data);
-    const silent = data.every((v) => Math.abs(v - 128) < 8);
-    if (silent) {
-      silenceTimer = setTimeout(() => {
-        if (recorder.state === 'recording') recorder.stop();
-      }, 2000);
-    } else {
-      clearTimeout(silenceTimer);
-    }
-    if (recorder.state === 'recording') requestAnimationFrame(checkSilence);
-  };
+  if (!options?.disableSilenceDetection) {
+    const checkSilence = () => {
+      const data = new Uint8Array(analyser.fftSize);
+      analyser.getByteTimeDomainData(data);
+      const silent = data.every((v) => Math.abs(v - 128) < 8);
+      if (silent) {
+        silenceTimer = setTimeout(() => {
+          if (recorder.state === 'recording') recorder.stop();
+        }, 2000);
+      } else {
+        clearTimeout(silenceTimer);
+      }
+      if (recorder.state === 'recording') requestAnimationFrame(checkSilence);
+    };
+    checkSilence();
+  }
 
   // Start recording in 250ms chunks
   recorder.start(250);
-  checkSilence();
 
   return {
     stop: () => {
